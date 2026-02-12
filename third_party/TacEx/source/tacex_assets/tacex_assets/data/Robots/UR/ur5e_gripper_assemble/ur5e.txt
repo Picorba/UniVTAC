@@ -1,0 +1,935 @@
+#usda 1.0
+(
+    defaultPrim = "Root"
+    upAxis = "Z"
+)
+
+def Xform "Root"
+{
+    def "ur5e" (
+        delete apiSchemas = ["PhysicsArticulationRootAPI", "PhysxArticulationAPI"]
+        prepend payload = @./ur5e_nv/ur5e.usd@
+        variants = {
+            string Gripper = "None"
+            string Physics = "PhysX"
+            string Sensor = "Sensors"
+        }
+    )
+    {
+        string isaac:namespace (
+            displayName = "Namespace"
+            doc = "Namespace of the prim in Isaac Sim"
+        )
+
+        over "joints"
+        {
+            over "robot_gripper_joint"
+            {
+                custom string isaac:nameOverride (
+                    displayName = "Name Override"
+                    doc = "Name override for prim lookup in base name search"
+                )
+            }
+
+            over "shoulder_pan_joint"
+            {
+                float drive:angular:physics:damping = 400
+                float drive:angular:physics:stiffness = 1000
+                float drive:angular:physics:targetPosition = 0
+                custom string isaac:nameOverride (
+                    displayName = "Name Override"
+                    doc = "Name override for prim lookup in base name search"
+                )
+                float physics:lowerLimit = -360
+                float physics:upperLimit = 360
+                float state:angular:physics:position = 0
+                float state:angular:physics:velocity = 0
+            }
+
+            over "shoulder_lift_joint"
+            {
+                float drive:angular:physics:damping = 400
+                float drive:angular:physics:stiffness = 1000
+                float drive:angular:physics:targetPosition = 0
+                custom string isaac:nameOverride (
+                    displayName = "Name Override"
+                    doc = "Name override for prim lookup in base name search"
+                )
+                float physics:lowerLimit = -360
+                float physics:upperLimit = 360
+                float state:angular:physics:position = 0
+                float state:angular:physics:velocity = 0
+            }
+
+            over "elbow_joint"
+            {
+                float drive:angular:physics:damping = 400
+                float drive:angular:physics:stiffness = 1000
+                float drive:angular:physics:targetPosition = 0
+                custom string isaac:nameOverride (
+                    displayName = "Name Override"
+                    doc = "Name override for prim lookup in base name search"
+                )
+                float physics:lowerLimit = -180
+                float physics:upperLimit = 180
+                float state:angular:physics:position = 0
+                float state:angular:physics:velocity = 0
+            }
+
+            over "wrist_1_joint"
+            {
+                float drive:angular:physics:damping = 400
+                float drive:angular:physics:stiffness = 1000
+                float drive:angular:physics:targetPosition = 0
+                custom string isaac:nameOverride (
+                    displayName = "Name Override"
+                    doc = "Name override for prim lookup in base name search"
+                )
+                float physics:lowerLimit = -360
+                float physics:upperLimit = 360
+                float state:angular:physics:position = 0
+                float state:angular:physics:velocity = 0
+            }
+
+            over "wrist_2_joint"
+            {
+                float drive:angular:physics:damping = 400
+                float drive:angular:physics:stiffness = 1000
+                float drive:angular:physics:targetPosition = 0
+                custom string isaac:nameOverride (
+                    displayName = "Name Override"
+                    doc = "Name override for prim lookup in base name search"
+                )
+                float physics:lowerLimit = -360
+                float physics:upperLimit = 360
+                float state:angular:physics:position = 0
+                float state:angular:physics:velocity = 0
+            }
+
+            over "wrist_3_joint"
+            {
+                float drive:angular:physics:damping = 400
+                float drive:angular:physics:stiffness = 1000
+                float drive:angular:physics:targetPosition = 0
+                custom string isaac:nameOverride (
+                    displayName = "Name Override"
+                    doc = "Name override for prim lookup in base name search"
+                )
+                float physics:lowerLimit = -360
+                float physics:upperLimit = 360
+                float state:angular:physics:position = 0
+                float state:angular:physics:velocity = 0
+            }
+        }
+
+        over "base_link" (
+            prepend apiSchemas = ["PhysicsArticulationRootAPI", "PhysxArticulationAPI"]
+        )
+        {
+            string isaac:nameOverride (
+                displayName = "Name Override"
+                doc = "Name override for prim lookup in base name search"
+            )
+            bool physics:kinematicEnabled = 0
+            rel physics:simulationOwner
+        }
+
+        over "shoulder_link"
+        {
+            rel physics:simulationOwner
+        }
+
+        over "upper_arm_link"
+        {
+            rel physics:simulationOwner
+        }
+
+        over "forearm_link"
+        {
+            string isaac:nameOverride (
+                displayName = "Name Override"
+                doc = "Name override for prim lookup in base name search"
+            )
+            rel physics:simulationOwner
+        }
+
+        over "wrist_1_link"
+        {
+            rel physics:simulationOwner
+        }
+
+        over "wrist_2_link"
+        {
+            rel physics:simulationOwner
+        }
+
+        over "wrist_3_link"
+        {
+            string isaac:nameOverride (
+                displayName = "Name Override"
+                doc = "Name override for prim lookup in base name search"
+            )
+            rel physics:simulationOwner
+
+            def PhysicsFixedJoint "FixedJoint"
+            {
+                rel physics:body0 = </Root/ur5e/Gripper/gripper_gf225/coupling>
+                rel physics:body1 = </Root/ur5e/wrist_3_link>
+                float physics:breakForce = 3.4028235e38
+                float physics:breakTorque = 3.4028235e38
+                point3f physics:localPos0 = (-6.634334e-10, -1.0856032e-8, -0.0069999825)
+                point3f physics:localPos1 = (0, 0, 0)
+                quatf physics:localRot0 = (1, 6.938894e-17, 7.190401e-15, -4.371139e-8)
+                quatf physics:localRot1 = (1, 0, 0, 0)
+            }
+        }
+
+        over "root_joint" (
+            active = true
+            delete apiSchemas = ["PhysicsArticulationRootAPI", "PhysxArticulationAPI"]
+        )
+        {
+            custom string isaac:nameOverride (
+                displayName = "Name Override"
+                doc = "Name override for prim lookup in base name search"
+            )
+            rel physics:body0 = </Root/ur5e/base_link>
+            rel physics:body1 = None
+            point3f physics:localPos0 = (0, 0, 0)
+            point3f physics:localPos1 = (0, 0, 0)
+            quatf physics:localRot0 = (1, 0, 0, 0)
+            quatf physics:localRot1 = (1, 0, 0, 0)
+        }
+
+        over "Gripper" (
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            rel material:binding = </Root/ur5e/Gripper/gripper/gripper_physics_material> (
+                bindMaterialAs = "weakerThanDescendants"
+            )
+
+            def "gripper_gf225" (
+                prepend apiSchemas = ["MaterialBindingAPI"]
+                prepend payload = @./gripper1009/gripper_gf225.usd@
+            )
+            {
+                rel material:binding = </Root/ur5e/Gripper/gripper_gf225/Looks/DefaultMaterial> (
+                    bindMaterialAs = "weakerThanDescendants"
+                )
+                token visibility = "inherited"
+                quatd xformOp:orient = (0.7071067811865476, 0, 0, -0.7071067811865475)
+                double3 xformOp:scale = (1, 1, 1)
+                double3 xformOp:translate = (0, 0, 0)
+                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+                over "finger_case_0"
+                {
+                    rel physics:simulationOwner
+
+                    over "finger_0_joint"
+                    {
+                        float drive:linear:physics:targetPosition = 0
+                        float physics:lowerLimit = 0
+                        float physics:upperLimit = 0.025
+                    }
+
+                    over "case"
+                    {
+                        token visibility = "inherited"
+                    }
+
+                    over "plate"
+                    {
+                        token visibility = "inherited"
+                        double3 xformOp:rotateZYX = (0, 0, 0)
+                        double3 xformOp:scale = (1, 1, 1)
+                        double3 xformOp:translate = (0, -1.3877787807814457e-17, 0)
+                        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateZYX", "xformOp:scale"]
+
+                        over "mesh"
+                        {
+                            bool primvars:invisibleToSecondaryRays = 1
+                            token visibility = "inherited"
+                        }
+                    }
+
+                    over "mesh"
+                    {
+                        rel physics:simulationOwner
+                        token visibility = "inherited"
+                    }
+
+                    over "rigidpad_0"
+                    {
+                        token visibility = "inherited"
+
+                        over "mesh" (
+                            prepend apiSchemas = ["PhysicsCollisionAPI", "PhysxCollisionAPI", "PhysxConvexHullCollisionAPI", "PhysicsMeshCollisionAPI"]
+                        )
+                        {
+                            uniform token physics:approximation = "convexHull"
+                            bool physics:collisionEnabled = 1
+                            rel physics:simulationOwner
+                        }
+                    }
+
+                    def Camera "Camera"
+                    {
+                        float2 clippingRange = (0.01, 100)
+                        float focalLength = 20
+                        float focusDistance = 0.025
+                        float horizontalAperture = 20
+                        custom uniform vector3d omni:kit:centerOfInterest = (0, 0, -0.02500000037252903)
+                        float verticalAperture = 18
+                        token visibility = "invisible"
+                        quatd xformOp:orient = (6.123233995736766e-17, 6.123233932053594e-17, 1, 6.123234559697539e-17)
+                        double3 xformOp:scale = (1, 1, 1)
+                        double3 xformOp:translate = (-0.01701, 0.08663, -0.023)
+                        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+                    }
+                }
+
+                over "finger_case_1"
+                {
+                    rel physics:simulationOwner
+
+                    over "mesh"
+                    {
+                        rel physics:simulationOwner
+                    }
+
+                    over "rigidpad_1"
+                    {
+                        token visibility = "inherited"
+                        double3 xformOp:rotateZYX = (0, 0, 0)
+                        double3 xformOp:scale = (1, 1, 1)
+                        double3 xformOp:translate = (0, -1.3877787807814457e-17, 0)
+                        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateZYX", "xformOp:scale"]
+
+                        over "mesh" (
+                            prepend apiSchemas = ["PhysicsCollisionAPI", "PhysxCollisionAPI", "PhysxConvexHullCollisionAPI", "PhysicsMeshCollisionAPI"]
+                        )
+                        {
+                            uniform token physics:approximation = "convexHull"
+                            bool physics:collisionEnabled = 1
+                            rel physics:simulationOwner
+                            bool primvars:invisibleToSecondaryRays = 1
+                            token visibility = "inherited"
+                        }
+                    }
+
+                    def Camera "Camera"
+                    {
+                        float2 clippingRange = (0.01, 10000000)
+                        float focalLength = 20
+                        float focusDistance = 0.025
+                        float horizontalAperture = 20
+                        float verticalAperture = 18
+                        token visibility = "invisible"
+                        quatd xformOp:orient = (1, 0, 0, 0)
+                        double3 xformOp:scale = (1, 1, 1)
+                        double3 xformOp:translate = (0.01701, 0.08663, 0.023)
+                        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+                    }
+                }
+
+                over "base" (
+                    delete apiSchemas = ["PhysicsArticulationRootAPI", "PhysxArticulationAPI"]
+                )
+                {
+                    rel physics:simulationOwner
+
+                    over "mesh"
+                    {
+                        rel physics:simulationOwner
+                    }
+                }
+
+                over "coupling"
+                {
+                    rel physics:simulationOwner
+
+                    over "mesh"
+                    {
+                        rel physics:simulationOwner
+                    }
+                }
+
+                over "gelpad_1"
+                {
+                    token visibility = "inherited"
+
+                    over "mesh"
+                    {
+                        bool primvars:invisibleToSecondaryRays = 1
+                    }
+                }
+
+                over "gelpad_0"
+                {
+                    token visibility = "inherited"
+
+                    over "mesh"
+                    {
+                        bool primvars:invisibleToSecondaryRays = 1
+                    }
+                }
+
+                over "plate" (
+                    active = false
+                )
+                {
+                }
+            }
+        }
+    }
+}
+
+over "Flattened_Prototype_1"
+{
+    def Xform "upperarm"
+    {
+        token visibility = "inherited"
+        quatd xformOp:orient = (0.4999999701976776, 0.4999999701976776, -0.4999999701976776, -0.4999999701976776)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (0, 0, 0.1379999965429306)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        def Mesh "mesh"
+        {
+            float3[] extent = [(-0.060096633, -0.060601313, -0.071829505), (0.060096517, 0.4845916, 0.07779854)]
+            uniform token subdivisionScheme = "none"
+            quatd xformOp:orient = (0.70711, 0.70711, 0, 0)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (0, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+            def GeomSubset "subset_" (
+                apiSchemas = ["MaterialBindingAPI"]
+                displayName = ""
+            )
+            {
+                uniform token elementType = "face"
+                uniform token familyName = "materialBind"
+                rel material:binding = </ur5e/Looks/Black>
+            }
+
+            def GeomSubset "subset_0" (
+                apiSchemas = ["MaterialBindingAPI"]
+                displayName = "\x01"
+            )
+            {
+                uniform token elementType = "face"
+                uniform token familyName = "materialBind"
+                rel material:binding = </ur5e/Looks/JointGrey>
+            }
+
+            def GeomSubset "LinkGrey" (
+                apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                uniform token elementType = "face"
+                uniform token familyName = "materialBind"
+                rel material:binding = </ur5e/Looks/LinkGrey>
+            }
+
+            def GeomSubset "Black" (
+                apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                uniform token elementType = "face"
+                uniform token familyName = "materialBind"
+                rel material:binding = </ur5e/Looks/Black>
+            }
+
+            def GeomSubset "subset_1" (
+                apiSchemas = ["MaterialBindingAPI"]
+                displayName = "\x03"
+            )
+            {
+                uniform token elementType = "face"
+                uniform token familyName = "materialBind"
+                rel material:binding = </ur5e/Looks/URBlue>
+            }
+
+            def GeomSubset "JointGrey" (
+                apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                uniform token elementType = "face"
+                uniform token familyName = "materialBind"
+                uniform token elementType = "face"
+                rel material:binding = </ur5e/Looks/JointGrey>
+            }
+
+            def GeomSubset "URBlue" (
+                apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                uniform token elementType = "face"
+                uniform token familyName = "materialBind"
+                uniform token elementType = "face"
+                rel material:binding = </ur5e/Looks/URBlue>
+            }
+        }
+    }
+}
+
+over "Flattened_Prototype_2"
+{
+    def Xform "forearm"
+    {
+        uniform token purpose = "guide"
+        token visibility = "inherited"
+        quatd xformOp:orient = (0.4999999701976776, 0.4999999701976776, -0.4999999701976776, -0.4999999701976776)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (0, 0, 0.007000000216066837)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        def Mesh "mesh" (
+            apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "PhysxSDFMeshCollisionAPI", "MaterialBindingAPI"]
+        )
+        {
+            rel material:binding = </ur5e/Looks/DefaultMaterial>
+            uniform token physics:approximation = "sdf"
+            uniform token subdivisionScheme = "none"
+        }
+    }
+}
+
+over "Flattened_Prototype_8"
+{
+    def Xform "base"
+    {
+        token visibility = "inherited"
+        quatd xformOp:orient = (-1, 0, 0, -8.742277657347586e-8)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        def Mesh "mesh"
+        {
+            float3[] extent = [(-0.07549902, -3.3001653e-9, -0.07549902), (0.07549902, 0.09909871, 0.07552542)]
+            uniform token subdivisionScheme = "none"
+            quatd xformOp:orient = (0.70711, 0.70711, 0, 0)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (0, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+            def GeomSubset "Black" (
+                apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                uniform token elementType = "face"
+                uniform token familyName = "materialBind"
+                rel material:binding = </ur5e/Looks/Black>
+            }
+
+            def GeomSubset "JointGrey" (
+                apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                uniform token elementType = "face"
+                uniform token familyName = "materialBind"
+            }
+        }
+    }
+}
+
+over "Flattened_Prototype_14"
+{
+    def Xform "wrist1"
+    {
+        token visibility = "inherited"
+        quatd xformOp:orient = (0.7071067690849304, 0.7071067690849304, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (0, 0, -0.12700000405311584)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        def Mesh "mesh"
+        {
+            float3[] extent = [(-0.03934321, -0.056293365, -0.16562386), (0.039355297, 0.05358664, -0.053449262)]
+            uniform token subdivisionScheme = "none"
+            quatd xformOp:orient = (0.70711, 0.70711, 0, 0)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (0, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+            def GeomSubset "Black" (
+                apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                uniform token elementType = "face"
+                uniform token familyName = "materialBind"
+                rel material:binding = </ur5e/Looks/Black>
+            }
+
+            def GeomSubset "subset_" (
+                apiSchemas = ["MaterialBindingAPI"]
+                displayName = "\x02"
+            )
+            {
+                uniform token elementType = "face"
+                uniform token familyName = "materialBind"
+                rel material:binding = </ur5e/Looks/URBlue>
+            }
+
+            def GeomSubset "JointGrey" (
+                apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                uniform token elementType = "face"
+                uniform token familyName = "materialBind"
+                rel material:binding = </ur5e/Looks/JointGrey>
+            }
+        }
+    }
+}
+
+over "Flattened_Prototype_9"
+{
+    def Xform "wrist3"
+    {
+        uniform token purpose = "guide"
+        token visibility = "inherited"
+        quatd xformOp:orient = (0.7071067690849304, 0.7071067690849304, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (0, 0, -0.09889999777078629)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        def Mesh "mesh" (
+            apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "PhysxSDFMeshCollisionAPI", "MaterialBindingAPI"]
+        )
+        {
+            float3[] extent = [(-0.03747909, 0.05314532, -0.038037162), (0.037626684, 0.098959446, 0.043517005)]
+            uniform token physics:approximation = "sdf"
+            uniform token subdivisionScheme = "none"
+        }
+    }
+}
+
+over "Flattened_Prototype_11"
+{
+    def Xform "forearm"
+    {
+        token visibility = "inherited"
+        quatd xformOp:orient = (0.4999999701976776, 0.4999999701976776, -0.4999999701976776, -0.4999999701976776)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (0, 0, 0.007000000216066837)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        def Mesh "mesh"
+        {
+            float3[] extent = [(-0.057792425, -0.058354486, -0.053449262), (0.05803532, 0.4310697, 0.056451432)]
+            uniform token subdivisionScheme = "none"
+            quatd xformOp:orient = (0.70711, 0.70711, 0, 0)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (0, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+            def GeomSubset "URBlue" (
+                apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                uniform token elementType = "face"
+                uniform token familyName = "materialBind"
+                rel material:binding = </ur5e/Looks/URBlue>
+            }
+
+            def GeomSubset "Black" (
+                apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                uniform token elementType = "face"
+                uniform token familyName = "materialBind"
+                rel material:binding = </ur5e/Looks/Black>
+            }
+
+            def GeomSubset "Black0" (
+                apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                uniform token elementType = "face"
+                uniform token familyName = "materialBind"
+                rel material:binding = </ur5e/Looks/Black>
+            }
+
+            def GeomSubset "LinkGrey" (
+                apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                uniform token elementType = "face"
+                uniform token familyName = "materialBind"
+                rel material:binding = </ur5e/Looks/LinkGrey>
+            }
+
+            def GeomSubset "Black1" (
+                apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                uniform token elementType = "face"
+                uniform token familyName = "materialBind"
+                rel material:binding = </ur5e/Looks/Black>
+            }
+
+            def GeomSubset "JointGrey" (
+                apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                uniform token elementType = "face"
+                uniform token familyName = "materialBind"
+                rel material:binding = </ur5e/Looks/JointGrey>
+            }
+
+            def GeomSubset "JointGrey0" (
+                apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                uniform token elementType = "face"
+                uniform token familyName = "materialBind"
+                rel material:binding = </ur5e/Looks/JointGrey>
+            }
+        }
+    }
+}
+
+over "Flattened_Prototype_3"
+{
+    def Xform "wrist1"
+    {
+        uniform token purpose = "guide"
+        token visibility = "inherited"
+        quatd xformOp:orient = (0.7071067690849304, 0.7071067690849304, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (0, 0, -0.12700000405311584)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        def Mesh "mesh" (
+            apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "PhysxSDFMeshCollisionAPI", "MaterialBindingAPI"]
+        )
+        {
+            float3[] extent = [(-0.03934322, 0.053449262, -0.056295324), (0.039357845, 0.16561854, 0.053586643)]
+            rel material:binding = </ur5e/Looks/DefaultMaterial>
+            uniform token physics:approximation = "sdf"
+            uniform token subdivisionScheme = "none"
+        }
+    }
+}
+
+over "Flattened_Prototype_12"
+{
+    def Xform "wrist3"
+    {
+        token visibility = "inherited"
+        quatd xformOp:orient = (0.7071067690849304, 0.7071067690849304, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (0, 0, -0.09889999777078629)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        def Mesh "mesh" (
+            apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            float3[] extent = [(-0.037553452, -0.03805428, -0.09893521), (0.037547715, 0.043516744, -0.053147037)]
+            rel material:binding = </ur5e/Looks/LinkGrey>
+            uniform token subdivisionScheme = "none"
+            quatd xformOp:orient = (0.70711, 0.70711, 0, 0)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (0, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+        }
+    }
+}
+
+over "Flattened_Prototype_7"
+{
+    def Xform "wrist2"
+    {
+        token visibility = "inherited"
+        quatd xformOp:orient = (1, 0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (0, 0, -0.09969999641180038)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        def Mesh "mesh"
+        {
+            float3[] extent = [(-0.03934694, 0.053586643, -0.053147636), (0.03934947, 0.1387819, 0.056731608)]
+            uniform token subdivisionScheme = "none"
+            quatd xformOp:orient = (0.70711, 0.70711, 0, 0)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (0, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+            def GeomSubset "Black" (
+                apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                uniform token elementType = "face"
+                uniform token familyName = "materialBind"
+                rel material:binding = </ur5e/Looks/Black>
+            }
+
+            def GeomSubset "URBlue" (
+                apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                uniform token elementType = "face"
+                uniform token familyName = "materialBind"
+                rel material:binding = </ur5e/Looks/URBlue>
+            }
+
+            def GeomSubset "JointGrey" (
+                apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                uniform token elementType = "face"
+                uniform token familyName = "materialBind"
+                rel material:binding = </ur5e/Looks/JointGrey>
+            }
+        }
+    }
+}
+
+over "Flattened_Prototype_13"
+{
+    def Xform "base"
+    {
+        uniform token purpose = "guide"
+        token visibility = "inherited"
+        quatd xformOp:orient = (-1, 0, 0, -8.742277657347586e-8)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        def Mesh "mesh" (
+            apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "PhysxSDFMeshCollisionAPI", "MaterialBindingAPI"]
+        )
+        {
+            float3[] extent = [(-0.07547873, -0.07550847, -9.570882e-8), (0.07549902, 0.075479105, 0.09909871)]
+            rel material:binding = </ur5e/Looks/DefaultMaterial>
+            uniform token physics:approximation = "sdf"
+            uniform token subdivisionScheme = "none"
+        }
+    }
+}
+
+over "Flattened_Prototype_10"
+{
+    def Xform "shoulder"
+    {
+        uniform token purpose = "guide"
+        token visibility = "inherited"
+        quatd xformOp:orient = (-4.371138828673793e-8, -0, 0, 1)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        def Mesh "mesh" (
+            apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "PhysxSDFMeshCollisionAPI", "MaterialBindingAPI"]
+        )
+        {
+            float3[] extent = [(-0.060088586, -0.060102627, -0.06390128), (0.06009789, 0.07440014, 0.071548015)]
+            rel material:binding = </ur5e/Looks/DefaultMaterial>
+            uniform token physics:approximation = "sdf"
+            uniform token subdivisionScheme = "none"
+        }
+    }
+}
+
+over "Flattened_Prototype_5"
+{
+    def Xform "wrist2"
+    {
+        uniform token purpose = "guide"
+        token visibility = "inherited"
+        quatd xformOp:orient = (1, 0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (0, 0, -0.09969999641180038)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        def Mesh "mesh" (
+            apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "PhysxSDFMeshCollisionAPI", "MaterialBindingAPI"]
+        )
+        {
+            float3[] extent = [(-0.039347354, -0.056736905, 0.053586647), (0.039351135, 0.05314764, 0.13880341)]
+            rel material:binding = </ur5e/Looks/DefaultMaterial>
+            uniform token physics:approximation = "sdf"
+            uniform token subdivisionScheme = "none"
+        }
+    }
+}
+
+over "Flattened_Prototype_4"
+{
+    def Xform "upperarm"
+    {
+        uniform token purpose = "guide"
+        token visibility = "inherited"
+        quatd xformOp:orient = (0.4999999701976776, 0.4999999701976776, -0.4999999701976776, -0.4999999701976776)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (0, 0, 0.1379999965429306)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        def Mesh "mesh" (
+            apiSchemas = ["PhysicsCollisionAPI", "PhysicsMeshCollisionAPI", "PhysxSDFMeshCollisionAPI", "MaterialBindingAPI"]
+        )
+        {
+            float3[] extent = [(-0.060095064, -0.077803195, -0.060601313), (0.060091946, 0.07186857, 0.4845916)]
+            rel material:binding = </ur5e/Looks/DefaultMaterial>
+            uniform token physics:approximation = "sdf"
+            uniform token subdivisionScheme = "none"
+        }
+    }
+}
+
+over "Flattened_Prototype_6"
+{
+    def Xform "shoulder"
+    {
+        token visibility = "inherited"
+        quatd xformOp:orient = (-4.371138828673793e-8, -0, 0, 1)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        def Mesh "mesh"
+        {
+            float3[] extent = [(-0.060081348, -0.06390128, -0.07440014), (0.06009917, 0.071523815, 0.060102627)]
+            uniform token subdivisionScheme = "none"
+            quatd xformOp:orient = (0.70711, 0.70711, 0, 0)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (0, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+            def GeomSubset "subset_" (
+                apiSchemas = ["MaterialBindingAPI"]
+                displayName = "\x02"
+            )
+            {
+                uniform token elementType = "face"
+                uniform token familyName = "materialBind"
+                rel material:binding = </ur5e/Looks/URBlue>
+            }
+
+            def GeomSubset "Black" (
+                apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                uniform token elementType = "face"
+                uniform token familyName = "materialBind"
+                rel material:binding = </ur5e/Looks/Black>
+            }
+
+            def GeomSubset "JointGrey" (
+                apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                uniform token elementType = "face"
+                uniform token familyName = "materialBind"
+                rel material:binding = </ur5e/Looks/JointGrey>
+            }
+        }
+    }
+}
+

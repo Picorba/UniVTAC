@@ -55,7 +55,7 @@ class ManiSkillSimulatorCfg(GelSightSimulatorCfg):
 
         # num_markers_col: int = 63
         # num_markers_row: int = 63
-        num_markers: int = 1200
+        num_markers: int = 63
         x0: float = 0
         y0: float = 0
         dx: float = 0

@@ -33,7 +33,6 @@ args_cli = parser.parse_args()
 args_cli.enable_cameras = True
 args_cli.num_envs = 1
 
-
 def get_config(file, default_root:Path, type:Literal['yaml', 'json']):
     if type == 'yaml':
         if file.endswith('.yml') or file.endswith('.yaml'):
@@ -59,7 +58,7 @@ task_config, task_config_file = get_config(
 )
 
 if task_config.get('render_frequency', 1) == 0:
-    args_cli.headless = True
+    args_cli.livestream = 2
 
 # launch omniverse app, must done before importing anything from omni.isaac
 app_launcher = AppLauncher(args_cli)

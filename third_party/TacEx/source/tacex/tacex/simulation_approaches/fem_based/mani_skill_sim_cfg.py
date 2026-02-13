@@ -17,7 +17,9 @@ class ManiSkillSimulatorCfg(GelSightSimulatorCfg):
 
     device: str = "cpu"
 
-    marker_interval_range: tuple[float, float] = (2.0625, 2.0625)
+    marker_shape: tuple[int, int] = (7, 9)
+
+    marker_interval: tuple[float, float] = (2.40625, 2.45833)
 
     marker_rotation_range: float = 0.0
 
@@ -31,21 +33,18 @@ class ManiSkillSimulatorCfg(GelSightSimulatorCfg):
 
     normalize: bool = False
 
-    camera_params: tuple[float, float, float, float, float] = (
-        340,
-        325,
-        160,
-        125,
-        0.0,
-    )
+    camera_to_surface: float = 0.0283,
 
-    tactile_img_res: tuple = (320, 240)
+    real_size: tuple[float, float] = (0.0266, 0.0209),
+
+    tactile_img_res: tuple[int, int] = (320, 240)
     """Resolution of the Tactile Image.
 
     Can be different from the Sensor Camera.
     If this is the case, then height map from camera is going to be up/down sampled.
     """
-    sub_marker_num: int = 16
+    
+    sub_marker_num: int = 0
 
     marker_radius: float = 0.01 # in mm
 

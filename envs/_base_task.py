@@ -212,7 +212,7 @@ class BaseTask(UipcRLEnv):
 
         self._setup_save()
         self.rng = np.random.default_rng()
-        super().__init__(cfg=cfg, render_mode=2, **kwargs) # Full Render
+        super().__init__(cfg=cfg, render_mode=render_mode, **kwargs) # Full Render
 
         self.logger = logging.getLogger(name=self.__class__.__name__)
         self.logger.setLevel(getattr(logging, self.cfg.logger_level.upper(), logging.ERROR))
@@ -476,15 +476,6 @@ class BaseTask(UipcRLEnv):
  
         self.last_render = self.step_count
     
-    def check(self, tactile_depth:torch.Tensor):
-        '''
-            tactile_depth: BxHxW
-        '''
-        depth = tactile_depth[50:-50, 50:-50]
-        if depth.min() == depth.max():
-            return False
-        return True
-
     def get_frame_shot(self, obs):
         head_obs = obs['observation']['head']['rgb'].clone()
         wrist_obs = obs['observation']['wrist']['rgb'].clone()

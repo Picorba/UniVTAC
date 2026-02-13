@@ -60,7 +60,7 @@ def worker_run(task_config, task_file_name, base_save_dir: Path, seed_q: Queue,
     app_args.enable_cameras = True
     app_args.num_envs = 1
     if task_config.get('render_frequency', 1) == 0:
-        app_args.headless = True
+        app_args.livestream = 2
 
     app_launcher = AppLauncher(app_args)
     simulation_app = app_launcher.app

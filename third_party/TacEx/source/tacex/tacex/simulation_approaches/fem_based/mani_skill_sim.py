@@ -36,7 +36,7 @@ class ManiSkillSimulator(GelSightSimulator):
         # needed for VisionTactileSensorUIPC class
         self.camera = None
         self.gelpad_uipc: UipcObject = self.sensor.gelpad_obj
-        self.radius = 8
+        self.radius = cfg.marker_radius
         self.draw_patch_array()
 
         super().__init__(sensor=sensor, cfg=cfg)
@@ -64,11 +64,10 @@ class ManiSkillSimulator(GelSightSimulator):
             self.gelpad_uipc,
             self.camera,
             sensor_type=self.cfg.sensor_type,
-            tactile_img_width=480,
-            tactile_img_height=480,
-            marker_shape=(9, 9),
-            marker_interval=(2.0, 2.0),
-            camera_params=self.cfg.camera_params,
+            tactile_img_width=self.cfg.tactile_img_res[0],
+            tactile_img_height=self.cfg.tactile_img_res[1],
+            marker_shape=self.cfg.marker_shape,
+            marker_interval=self.cfg.marker_interval,
             sub_marker_num=self.cfg.sub_marker_num,
             marker_radius=self.radius,
             num_markers=self.cfg.marker_params.num_markers,

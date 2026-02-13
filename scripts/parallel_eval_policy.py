@@ -62,7 +62,7 @@ def worker_run(args, deploy_config, task_config, task_file_name, policy_name,
     # Build minimal args for app
     app_args = parser.parse_args([])  # empty to use defaults
     app_args.enable_cameras = True
-    app_args.headless = True
+    app_args.livestream = 2
     app_args.num_envs = 1
 
     app_launcher = AppLauncher(app_args)

@@ -68,7 +68,7 @@ def create_gelsight_mini_cfg(
         ),
         data_types=data_type
     )
-    sensor_cfg.marker_motion_sim_cfg.marker_params.num_markers = 1200
+    sensor_cfg.marker_motion_sim_cfg.marker_params.num_markers = 63
     sensor_cfg.optical_sim_cfg = sensor_cfg.optical_sim_cfg.replace(
         with_shadow=False,
         tactile_img_res=resolution,
@@ -126,12 +126,12 @@ def create_gf225_cfg(
     from tacex.simulation_approaches.mlp_fots import MLPFOTSSimulatorCfg
     from tacex_assets import TACEX_ASSETS_DATA_DIR
 
-    sensor_cfg.marker_motion_sim_cfg.marker_params.num_markers = 1200
+    sensor_cfg.marker_motion_sim_cfg.marker_params.num_markers = 81
     sensor_cfg.optical_sim_cfg = MLPFOTSSimulatorCfg(
-    calib_folder_path=f"{TACEX_ASSETS_DATA_DIR}/Sensors/GF225/calibs/480x480",
-    tactile_img_res=resolution,
-    device="cuda",
-)
+        calib_folder_path=f"{TACEX_ASSETS_DATA_DIR}/Sensors/GF225/calibs/480x480",
+        tactile_img_res=resolution,
+        device="cuda",
+    )
     # sensor_cfg.optical_sim_cfg = sensor_cfg.optical_sim_cfg.replace(
     #     with_shadow=False,
     #     tactile_img_res=resolution,

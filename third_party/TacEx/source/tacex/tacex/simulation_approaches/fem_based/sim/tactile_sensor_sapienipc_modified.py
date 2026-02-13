@@ -47,26 +47,20 @@ class VisionTactileSensorUIPC:
         uipc_gelpad: UipcObject,
         camera,
         sensor_type: str,
-        tactile_img_width=480,
-        tactile_img_height=480,
-        # marker_shape=(9, 7),
-        marker_shape=(9, 9),
-        marker_interval=(1.2, 1.2),
+        tactile_img_width=320,
+        tactile_img_height=240,
+        marker_shape=(9, 7),
+        marker_interval=(2.40625, 2.45833),
         marker_random_rotation_range=0,  # 标记点旋转范围（rad）
         marker_random_translation_range=(0, 0),  # 随机偏移范围（mm）
         marker_random_noise=0.0,
         sub_marker_num=0,
         marker_lose_tracking_probability=0.0,
         normalize: bool = False,
-        num_markers: int = 81,
-        camera_params: tuple[float, float, float, float, float] = (
-            480,
-            480,
-            240,
-            240,
-            0.0,
-        ),
-        marker_radius: float = 2, # in mm
+        num_markers: int = 128,
+        camera_to_surface: float = 0.0283,
+        real_size: tuple[float, float] = (0.0266, 0.0209),
+        marker_radius: float = 12,
         **kwargs,
     ):
         """
@@ -113,8 +107,7 @@ class VisionTactileSensorUIPC:
         self.sub_marker_num = sub_marker_num
         self.marker_radius = marker_radius
 
-        camera_to_surface = 0.0265
-        real_size = np.array([0.0235, 0.0250])
+        real_size = np.array(real_size)
         img_size = np.array([tactile_img_width, tactile_img_height])
         fx, fy = img_size * camera_to_surface / real_size
         cx, cy = img_size / 2
@@ -129,12 +122,14 @@ class VisionTactileSensorUIPC:
         self.camera_distort_coeffs = np.array([0, 0, 0, 0, 0], dtype=np.float32)
 
         self.marker_grid = self._gen_marker_grid()
+        self.init_vertices()
+        # self.phong_shading_renderer = PhongShadingRenderer()
+    
+    def init_vertices(self):
         self.init_surface_vertices_camera = self.get_surface_vertices_camera().clone()
         self.reference_surface_vertices_camera = self.get_surface_vertices_camera().clone()
         self.marker_surf_idx, self.marker_weight = self._gen_marker_weight(self.marker_grid)
-
         self.constrain_pts = self.get_vertices_camera()[self.constrain_ids].cpu().numpy()
-        # self.phong_shading_renderer = PhongShadingRenderer()
 
     def get_vertices_world(self):
         v = self.gelpad_obj._data.nodal_pos_w
@@ -328,19 +323,6 @@ class VisionTactileSensorUIPC:
             self.get_surface_vertices_camera()[self.marker_surf_idx].cpu().numpy()
             * self.marker_weight[..., None]
         ).sum(1)
-
-        # draw markers in sim world
-        # draw.clear_points()
-        # curr_marker_pts_3d = curr_marker_pts.copy()
-        # curr_marker_pts_3d = (
-        #     self.transform_camera_to_world_frame(torch.tensor(curr_marker_pts_3d, device="cuda:0", dtype=torch.float32))
-        #     .cpu()
-        #     .numpy()
-        # )
-        # draw.draw_points(
-        #     curr_marker_pts_3d, [(255, 0, 0, 0.5)] * curr_marker_pts_3d.shape[0], [30] * curr_marker_pts_3d.shape[0]
-        # )
-        import trimesh
 
         mean_motion = np.mean(
             self.get_vertices_camera()[self.constrain_ids].cpu().numpy() - self.constrain_pts, axis=0)

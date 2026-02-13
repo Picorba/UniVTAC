@@ -28,10 +28,7 @@ class RobotManager:
         self.task = task
         self.device = task.device
         self.sensor_type = task.cfg.tactile_sensor_type
-        if self.sensor_type in ['gsmini', 'xsensews']: # franka panda
-            self.robot_type = 'franka_panda'
-        else:
-            # self.robot_type = 'ur5e'
+        if self.sensor_type in ['gsmini', 'gf225', 'xsensews']: # franka panda
             self.robot_type = 'franka_panda'
 
         self.robot = Articulation(self.cfg.robot)
@@ -42,10 +39,8 @@ class RobotManager:
         self.last_arm_velocity = None
         self.last_gripper_velocity = None
 
-    def setup(self):
-        """设置机器人属性"""
         if self.robot_type == 'franka_panda':
-            hand_name = 'panda_hand'
+            self.hand_name = 'panda_hand'
             self._arm_joint_names = [
                 'panda_joint1', 'panda_joint2', 'panda_joint3', 'panda_joint4',
                 'panda_joint5', 'panda_joint6', 'panda_joint7'
@@ -54,7 +49,7 @@ class RobotManager:
                 'panda_finger_joint1', 'panda_finger_joint2'
             ]
             self.gripper_max_qpos = self.cfg.gripper_max_qpos
-            yaml_path = str(EMBODIMENTS_ROOT / 'franka' / 'curobo.yml')
+            self.yaml_path = str(EMBODIMENTS_ROOT / 'franka' / 'curobo.yml')
             offset = self.cfg.gripper_offset
         else:
             raise NotImplementedError(f"Robot type {self.robot_type} not implemented.")
@@ -64,7 +59,9 @@ class RobotManager:
         self._offset_pos = torch.tensor([0.0, 0.0, offset], device=self.device).repeat(self.task.num_envs, 1)
         self._offset_rot = torch.tensor([1.0, 0.0, 0.0, 0.0], device=self.device).repeat(self.task.num_envs, 1)
 
-        body_ids, body_names = self.robot.find_bodies(hand_name)
+    def setup(self):
+        """设置机器人属性"""
+        body_ids, body_names = self.robot.find_bodies(self.hand_name)
         self._body_idx = body_ids[0]
         self._body_name = body_names[0]
         self._jacobi_body_idx = self._body_idx - 1
@@ -87,7 +84,7 @@ class RobotManager:
             all_joints_name=self.robot.joint_names,
             active_joints_name=self._arm_joint_names,
             robot_prime_path=self.cfg.robot.prim_path,
-            yaml_path=yaml_path
+            yaml_path=self.yaml_path
         )
         self.planner = CuroboPlanner(
             task=self.task,
@@ -179,12 +176,12 @@ class RobotManager:
         return target_pos
 
     def plan_gripper(self, pos:float, type:Literal['percent', 'qpos'] = 'percent'):
-        num_steps = 5
         if type == 'percent':
             target_pos = self.gripper_percent2qpos(pos)
         else:
             target_pos = pos
         gripper_pos = self.robot.data.joint_pos[0, self._gripper_ids][0]
+        num_steps = np.ceil(abs(target_pos - gripper_pos.cpu().item()) / 0.0005).astype(int)
         position = torch.linspace(gripper_pos, target_pos, num_steps, device=self.device)
         velocity = torch.clip((position - gripper_pos)/self.task.cfg.sim.dt, -0.0001, 0.0001)
 

@@ -56,19 +56,24 @@ def create_gelsight_mini_cfg(
             resolution=resolution,
             update_period=update_period,
             data_types=["depth", "rgb"],
-            clipping_range=(0.01, 0.03),  # (0.024, 0.034),
+            clipping_range=(0.024, 0.034),
         ),
         device="cuda",
         debug_vis=False,  # for rendering sensor output in the gui
         update_period=1/120,
         marker_motion_sim_cfg=ManiSkillSimulatorCfg(
             tactile_img_res=resolution,
+            marker_shape=(9, 7),
+            marker_interval=(2.40625, 2.45833),
             sub_marker_num=0,
+            marker_radius=6,
+            camera_to_surface=0.0283,
+            real_size=(0.0266, 0.0209),
             sensor_type='gsmini',
         ),
         data_types=data_type
     )
-    sensor_cfg.marker_motion_sim_cfg.marker_params.num_markers = 63
+    sensor_cfg.marker_motion_sim_cfg.marker_params.num_markers = 64
     sensor_cfg.optical_sim_cfg = sensor_cfg.optical_sim_cfg.replace(
         with_shadow=False,
         tactile_img_res=resolution,
@@ -101,7 +106,7 @@ def create_gf225_cfg(
 ) -> TactileCfg:
     resolution = (480, 480)  # GF225 resolution
     update_period = 1/120
-    # Step 1: Create sensor_cfg
+    
     sensor_cfg = GF225Cfg(
         prim_path=prim_path,
         sensor_camera_cfg=GF225Cfg.SensorCameraCfg(
@@ -117,12 +122,16 @@ def create_gf225_cfg(
         marker_motion_sim_cfg=ManiSkillSimulatorCfg(
             tactile_img_res=resolution,
             sub_marker_num=0,
+            marker_radius=8,
+            marker_shape=(9, 9),
+            marker_interval=(2.0, 2.0),
+            camera_to_surface=0.0265,
+            real_size = (0.0235, 0.0250),
             sensor_type='gf225',
         ),
         data_types=data_type
     )
-    # qyy tag change from optical taxim to optical fots here
-    # Step 2: Configure marker and optical sim
+    
     from tacex.simulation_approaches.mlp_fots import MLPFOTSSimulatorCfg
     from tacex_assets import TACEX_ASSETS_DATA_DIR
 
@@ -132,16 +141,10 @@ def create_gf225_cfg(
         tactile_img_res=resolution,
         device="cuda",
     )
-    # sensor_cfg.optical_sim_cfg = sensor_cfg.optical_sim_cfg.replace(
-    #     with_shadow=False,
-    #     tactile_img_res=resolution,
-    #     device="cuda",
-    # )
-
-    # Step 3: Wrap in TactileCfg
+    
     cfg = TactileCfg(
         name=name,
-        sensor_cfg=sensor_cfg,  # <-- This is missing in current code
+        sensor_cfg=sensor_cfg,
         gelpad_cfg=UipcObjectCfg(
             prim_path=gelpad_prim_path,
             constitution_cfg=UipcObjectCfg.StableNeoHookeanCfg(youngs_modulus=0.1),
@@ -220,18 +223,12 @@ def create_tactile_cfg(
     sensor_type:Literal['gsmini', 'xensews', 'gf225'] = "gsmini",
     data_type:list[str] = ["camera_depth", "tactile_rgb"],
 ) -> TactileCfg:
-    # resolution = (320, 240)
-    resolution = (480, 480)
-    update_period = 1/120
-    
     if sensor_type == "gsmini":
         return create_gelsight_mini_cfg(
             prim_path=prim_path,
             gelpad_prim_path=gelpad_prim_path,
             gelpad_attachment_body_name=gelpad_attachment_body_name,
             name=name,
-            resolution=resolution,
-            update_period=update_period,
             data_type=data_type,
         )
     elif sensor_type == "xensews":
@@ -240,8 +237,6 @@ def create_tactile_cfg(
             gelpad_prim_path=gelpad_prim_path,
             gelpad_attachment_body_name=gelpad_attachment_body_name,
             name=name,
-            resolution=resolution,
-            update_period=update_period,
             data_type=data_type,
         )
     elif sensor_type == "gf225":
@@ -281,6 +276,8 @@ class VisualTactileSensor:
         init_trans = estimate_rigid_transform(self.origin_pts, attach_pts)
         self.attach_to_init = np.linalg.inv(init_trans)
         self.attach_to_init = torch.tensor(self.attach_to_init, dtype=torch.float64, device=self.device)
+
+        self.sensor.marker_motion_simulator.marker_motion_sim.init_vertices()
 
     def get_attach_pose(self):
         if type(self.attachment.isaaclab_rigid_object) is Articulation:

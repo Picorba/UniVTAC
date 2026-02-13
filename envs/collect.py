@@ -27,7 +27,6 @@ class TaskCfg(BaseTaskCfg):
         )
     ]
     max_save_frames = 400
-    use_adaptive_grasp = False
 
 class Task(BaseTask):
     def __init__(self, cfg: BaseTaskCfg, mode:Literal['collect', 'eval'] = 'collect', render_mode: str|None = None, **kwargs):
@@ -69,15 +68,19 @@ class Task(BaseTask):
         ))
 
         if self.cfg.tactile_sensor_type == 'gsmini':
-            grasp_qpos = np.random.uniform(0.0100, 0.013) / self._robot_manager.gripper_max_qpos
+            self.cfg.use_adaptive_grasp = True
+            self.cfg.adaptive_grasp_depth_threshold = self.rng.uniform(27.7, 28.1)
+            self.move(self.atom.close_gripper())
+            self.metadata['grasp_threshold'] = self._tactile_manager.get_min_depth().tolist()
         elif self.cfg.tactile_sensor_type == 'gf225':
+            self.cfg.use_adaptive_grasp = False
             grasp_qpos = np.random.uniform(0.0118, 0.013) / self._robot_manager.gripper_max_qpos
+            self.move(self.atom.close_gripper(pos=grasp_qpos))
+            self.metadata['grasp_qpos'] = grasp_qpos
         elif self.cfg.tactile_sensor_type == 'xensews':
             grasp_qpos = np.random.uniform(0.0118, 0.013) / self._robot_manager.gripper_max_qpos
- 
-        self.move(self.atom.close_gripper(pos=grasp_qpos))
+            self.move(self.atom.close_gripper(pos=grasp_qpos))
         self.cfg.keep_contact = True
-        self.metadata['grasp_qpos'] = grasp_qpos
 
     def _play_once(self):
         rotate = self.rng.choice([-1, 1]) * self.rng.uniform(np.pi/3, np.pi*7/18)

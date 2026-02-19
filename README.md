@@ -1,4 +1,7 @@
-# UniVTAC
+<h1 align="center">UniVTAC</h1>
+
+> UniVTAC: A Unified Simulation Platform for Visuo-Tactile Manipulation Data Generation, Learning, and Benchmarking<br>
+> [arXiv](https://arxiv.org/abs/2602.10093) | [PDF](https://arxiv.org/pdf/2602.10093) | [Website](https://univtac.github.io/)
 
 **UniVTAC** is a tactile-aware simulation benchmark for robotic manipulation built on top of **NVIDIA Isaac Lab** and **TacEx (UIPC-based tactile simulation)**. It provides a unified framework for collecting expert demonstrations, training visuotactile policies, and evaluating them across a diverse suite of contact-rich manipulation tasks — all with high-fidelity tactile feedback from simulated GelSight Mini, ViTai GF225, or XenseWS sensors.
 
@@ -53,3 +56,18 @@ To deploy your own policy, refer to the [Deploy Your Policy](./docs/Deploy.md).
 ## TODO
 
 - Data collection and evaluation are now only supported on the GelSight Mini sensor. We will add support for ViTai GF225 and XenseWS in the near future.
+
+## 👍 Citations
+If you find our work useful, please consider citing:
+
+```
+@article{chen2026univtac,
+  title={UniVTAC: A Unified Simulation Platform for Visuo-Tactile Manipulation Data Generation, Learning, and Benchmarking},
+  author={Chen, Baijun and Wan, Weijie and Chen, Tianxing and Guo, Xianda and Xu, Congsheng and Qi, Yuanyang and Zhang, Haojie and Wu, Longyan and Xu, Tianling and Li, Zixuan and others},
+  journal={arXiv preprint arXiv:2602.10093},
+  year={2026}
+}
+```
+
+## 🏷️ License
+This repository is released under the MIT license. See [LICENSE](./LICENSE) for additional details.

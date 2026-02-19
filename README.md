@@ -29,6 +29,8 @@ UniVTAC currently includes the following manipulation tasks, all featuring tacti
 
 See the [Data Collection Guide](./docs/Collection.md) for instructions on how to run the automated data collection pipeline, configure task-specific parameters, and understand the output data structure.
 
+Dataset containing 100 episodes per task can be downloaded from [Modelscope](https://modelscope.cn/datasets/byml2024/UniVTAC) or by running the script in `data/download.sh`.
+
 ## Train & Eval Policies
 
 UniVTAC includes several baseline policies implemented under the `policy/` directory:

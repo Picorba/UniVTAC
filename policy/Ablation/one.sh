@@ -18,7 +18,7 @@ export TRAIN_CONFIG=$train_config
 
 # 如果不是 -e 模式，执行完整流程
 if [ "$skip_to_eval" = false ]; then
-    if [ -d "../act_data/sim-$task_name/$task_config-$expert_data_num" ]; then
+    if [ -d "./data/sim-$task_name/$task_config-$expert_data_num" ]; then
         echo "Processed data for $task_name already exists. Skipping data processing."
     else
         echo "Processing data for $task_name..."

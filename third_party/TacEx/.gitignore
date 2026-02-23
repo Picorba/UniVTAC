@@ -57,7 +57,7 @@ systems.json
 NvStreamer*
 
 # Tests
-tests/
+/tests/
 
 # Docker history
 .isaac-lab-docker-history

@@ -1,11 +1,8 @@
 from .actor import *
 from .transforms import *
 
-from copy import deepcopy
-
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from tacex_uipc import UipcInteractiveScene
     from .._base_task import BaseTask
 
 # 世界坐标euler角
@@ -256,7 +253,6 @@ class Atom:
             target_point - grasp_bias - pre_dis * target_dis_vec,
             target_grasp_qpose
         )
-
 
     def place_actor(
         self,

@@ -2,10 +2,8 @@ import torch
 import scipy
 import numpy as np
 import transforms3d as t3d
-from typing import Literal, TYPE_CHECKING
+from typing import Literal
 
-if TYPE_CHECKING:
-    from .._base_task import BaseTask
 
 
 class Pose:

@@ -266,7 +266,7 @@ def main():
     num = args.expert_data_num
 
     # 输入目录：TacArena 原始数据
-    load_dir = f"../../data/{task_config}/{task_name}/"
+    load_dir = f"../../data/{task_name}/{task_config}/"
     
     # 输出目录：per-episode HDF5 文件
     save_dir = f"./data/{task_name}-{task_config}-{num}"

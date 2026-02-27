@@ -122,8 +122,8 @@ if __name__ == "__main__":
     task_config = args.task_config
     expert_data_num = args.expert_data_num
 
-    input_path = os.path.join("../../data/", task_config, task_name)
-    output_path = f"../act_data/sim-{task_name}/{task_config}-{expert_data_num}"
+    input_path = os.path.join("../../data/", task_name, task_config)
+    output_path = f"./data/sim-{task_name}/{task_config}-{expert_data_num}"
     
     begin, cam_type = data_transform(input_path, expert_data_num, output_path)
 
@@ -136,7 +136,7 @@ if __name__ == "__main__":
         SIM_TASK_CONFIGS = {}
 
     SIM_TASK_CONFIGS[f"sim-{task_name}-{task_config}-{expert_data_num}"] = {
-        "dataset_dir": f"../act_data/sim-{task_name}/{task_config}-{expert_data_num}",
+        "dataset_dir": f"./data/sim-{task_name}/{task_config}-{expert_data_num}",
         "num_episodes": expert_data_num,
         "episode_len": 1000,
         "camera_names": ["cam_high", "tac_left", "tac_right"] if cam_type != 'all' \

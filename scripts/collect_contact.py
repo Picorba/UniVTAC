@@ -4,7 +4,6 @@ sys.path.append('.')
 import time
 import yaml
 import json
-import torch
 import argparse
 import traceback
 from pathlib import Path

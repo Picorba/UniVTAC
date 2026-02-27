@@ -226,7 +226,7 @@ def main():
 
     # Base save dir with timestamp; per-worker subfolders appended inside worker
     curr_time = time.strftime(r'%Y-%m-%d_%H:%M:%S')
-    base_save_dir = Path(task_config.get("save_dir", "./data")) / task_config_file.stem / args.task
+    base_save_dir = Path(task_config.get("save_dir", "./data")) / args.task / task_config_file.stem
     base_save_dir.mkdir(parents=True, exist_ok=True)
     out_log = base_save_dir / f'{curr_time}.out'
     clean_log = base_save_dir / f'{curr_time}.log'

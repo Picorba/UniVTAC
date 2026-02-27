@@ -1,4 +1,3 @@
-import os
 import cv2
 import h5py
 import pickle
@@ -8,7 +7,7 @@ import torch
 import numpy as np
 from tqdm import tqdm
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 
 class HDF5Handler:
     @staticmethod

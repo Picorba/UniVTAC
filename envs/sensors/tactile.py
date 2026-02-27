@@ -1,27 +1,20 @@
 import torch
 from envs.utils import data
 import numpy as np
-from tacex import GelSightSensor, GelSightSensorCfg
-from tacex_assets import TACEX_ASSETS_DATA_DIR
+from tacex import GelSightSensor
 from tacex_assets.sensors.gf225.gf225_cfg import GF225Cfg
 from tacex.simulation_approaches.fem_based import ManiSkillSimulatorCfg
-from tacex.simulation_approaches.fots import FOTSMarkerSimulatorCfg
 
 from isaaclab.utils import configclass
 import isaaclab.utils.math as math_utils
-from isaaclab.markers.config import FRAME_MARKER_CFG
 from isaaclab.assets import Articulation, RigidObject
-from isaaclab.sensors import FrameTransformer, FrameTransformerCfg
-from isaaclab.sensors.frame_transformer.frame_transformer_cfg import OffsetCfg
-from isaaclab.assets import Articulation, ArticulationCfg, AssetBaseCfg, RigidObject, RigidObjectCfg
+from isaaclab.assets import Articulation, RigidObject
 
 from tacex_uipc import (
-    UipcRLEnv,
     UipcIsaacAttachments,
     UipcIsaacAttachmentsCfg,
     UipcObject,
     UipcObjectCfg,
-    UipcSimCfg
 )
 
 from ..utils.transforms import *

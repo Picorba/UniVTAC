@@ -1,4 +1,7 @@
-# UniVTAC
+<h1 align="center">UniVTAC</h1>
+
+> UniVTAC: A Unified Simulation Platform for Visuo-Tactile Manipulation Data Generation, Learning, and Benchmarking<br>
+> [arXiv](https://arxiv.org/abs/2602.10093) | [PDF](https://arxiv.org/pdf/2602.10093) | [Website](https://univtac.github.io/) | [HuggingFace Dataset](https://huggingface.co/datasets/byml/UniVTAC) | [Modelscope Dataset](https://modelscope.cn/datasets/byml2024/UniVTAC)
 
 **UniVTAC** is a tactile-aware simulation benchmark for robotic manipulation built on top of **NVIDIA Isaac Lab** and **TacEx (UIPC-based tactile simulation)**. It provides a unified framework for collecting expert demonstrations, training visuotactile policies, and evaluating them across a diverse suite of contact-rich manipulation tasks — all with high-fidelity tactile feedback from simulated GelSight Mini, ViTai GF225, or XenseWS sensors.
 
@@ -25,6 +28,8 @@ UniVTAC currently includes the following manipulation tasks, all featuring tacti
 ## Data Collection
 
 See the [Data Collection Guide](./docs/Collection.md) for instructions on how to run the automated data collection pipeline, configure task-specific parameters, and understand the output data structure.
+
+Dataset containing 100 episodes per task can be downloaded from [HuggingFace](https://huggingface.co/datasets/byml/UniVTAC), [Modelscope](https://modelscope.cn/datasets/byml2024/UniVTAC) or by running the script in `data/download.sh`.
 
 ## Train & Eval Policies
 
@@ -53,3 +58,23 @@ To deploy your own policy, refer to the [Deploy Your Policy](./docs/Deploy.md).
 ## TODO
 
 - Data collection and evaluation are now only supported on the GelSight Mini sensor. We will add support for ViTai GF225 and XenseWS in the near future.
+
+## 👍 Citations
+If you find our work useful, please consider citing:
+
+```
+@article{chen2026univtac,
+  title={UniVTAC: A Unified Simulation Platform for Visuo-Tactile Manipulation Data Generation, Learning, and Benchmarking},
+  author={Chen, Baijun and Wan, Weijie and Chen, Tianxing and Guo, Xianda and Xu, Congsheng and Qi, Yuanyang and Zhang, Haojie and Wu, Longyan and Xu, Tianling and Li, Zixuan and others},
+  journal={arXiv preprint arXiv:2602.10093},
+  year={2026}
+}
+```
+
+## 🏷️ License
+This repository is released under the MIT license. See [LICENSE](./LICENSE) for additional details.
+
+## Contact
+<div style="text-align: center;">
+  <img src="https://box.nju.edu.cn/seafhttp/f/fc1021a908ff49309f22/?op=view" alt="Wechat Group" width="300"/>
+</div>

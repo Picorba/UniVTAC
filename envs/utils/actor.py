@@ -1,30 +1,20 @@
-from collections import defaultdict
 from pathlib import Path
-import transforms3d as t3d
-from functools import partial
 from typing import Literal, Generator
 
-from pxr import Usd, Vt, Gf, Sdf, UsdShade, UsdGeom
+from pxr import Sdf, UsdShade, UsdGeom
 
 import isaaclab.sim as sim_utils
 from isaaclab.utils.math import *
 from isaaclab.utils import configclass
-from isaaclab.sensors import FrameTransformer, FrameTransformerCfg
-from isaaclab.assets import Articulation, ArticulationCfg, AssetBaseCfg, RigidObject, RigidObjectCfg
+from isaaclab.assets import AssetBaseCfg
 
 from tacex_uipc import (
-    UipcRLEnv,
-    UipcIsaacAttachments,
-    UipcIsaacAttachmentsCfg,
     UipcObject,
     UipcObjectCfg,
-    UipcSimCfg,
-    UipcSim
 )
 from uipc import Animation, builtin, view
 from uipc.constitution import SoftTransformConstraint, SoftPositionConstraint
 from uipc.geometry import GeometrySlot, SimplicialComplex
-from tacex_uipc.utils import TetMeshCfg
 from .transforms import *
 from .._global import *
 

@@ -6,61 +6,33 @@ import pickle
 import torchvision
 
 from envs.utils.data import HDF5Handler, VideoHandler
-from warp import Function
-import isaaclab
 import numpy as np
 from pathlib import Path
-from typing import Generator, Literal
-import decorator
+from typing import Literal
 
-import carb
-import omni.ui
+
 import logging
-from contextlib import suppress
-from isaacsim.core.api.objects import VisualCuboid
-from isaacsim.core.prims import XFormPrim
-with suppress(ImportError):
-    # isaacsim.gui is not available when running in headless mode.
-    import isaacsim.gui.components.ui_utils as ui_utils
+
+
 
 import isaaclab.sim as sim_utils
-import isaaclab.utils.math as math_utils
-from isaaclab.assets import Articulation, ArticulationCfg, AssetBaseCfg, RigidObject, RigidObjectCfg
-from isaaclab.controllers.differential_ik import DifferentialIKController
-from isaaclab.controllers.differential_ik_cfg import DifferentialIKControllerCfg
+from isaaclab.assets import  AssetBaseCfg, RigidObject, RigidObjectCfg
+
 from isaaclab.envs import DirectRLEnvCfg, ViewerCfg
 from isaaclab.envs.ui import BaseEnvWindow
-from isaaclab.markers.config import FRAME_MARKER_CFG
 from isaaclab.scene import InteractiveSceneCfg
-from isaaclab.sensors import FrameTransformer, FrameTransformerCfg
-from isaaclab.sensors.frame_transformer.frame_transformer_cfg import OffsetCfg
 from isaaclab.sim import PhysxCfg, SimulationCfg
 from isaaclab.sim.schemas.schemas_cfg import RigidBodyPropertiesCfg
 from isaaclab.utils import configclass
-from isaaclab.utils.math import (
-    euler_xyz_from_quat,
-    quat_error_magnitude,
-    sample_uniform,
-    wrap_to_pi,
-)
+
 from isaaclab.utils.noise import (
     GaussianNoiseCfg,
-    NoiseModelCfg,
-    UniformNoiseCfg,
-    gaussian_noise,
 )
 
-from tacex_assets import TACEX_ASSETS_DATA_DIR
-from tacex_assets.sensors.gelsight_mini.gsmini_cfg import GelSightMiniCfg
 from tacex_uipc import (
     UipcRLEnv,
-    UipcIsaacAttachments,
-    UipcIsaacAttachmentsCfg,
-    UipcObject,
-    UipcObjectCfg,
     UipcSimCfg,
 )
-from tacex_uipc.utils import TetMeshCfg
 
 from typing import Any
 
@@ -69,7 +41,7 @@ from .utils import *
 from .robot.robot import RobotManager
 from .robot.robot_cfg import *
 from .sensors.camera import CameraManager, CameraCfg
-from .sensors.tactile import TactileManager, TactileCfg, create_tactile_cfg
+from .sensors.tactile import TactileManager
 
 
 @configclass
@@ -980,23 +952,6 @@ class BaseTask(UipcRLEnv):
             success = self.move(self.atom.move_by_displacement(
                 z=delta, xyz_coord='local'
             ), tag='try_forward', is_save=is_save, delay=False, cosntraint_pose=[1, 1, 1, 1, 1, 0])
-            actor_pose = actor.get_pose()
-            if np.linalg.norm(actor_pose.p - actor_last_pose.p) < np.abs(delta):
-                return False
-            actor_last_pose = actor_pose
-        return True
-
-    def try_forward(self, actor:Actor, dis=0.01, delta_d=0.004, is_save=True):
-        if self.plan_success is False:
-            return False
-
-        actor_last_pose = actor.get_pose()
-        max_trials = int(np.ceil(np.abs(dis/delta_d)))
-        delta = np.sign(dis) * delta_d
-        for i in range(max_trials):
-            success = self.move(self.atom.move_by_displacement(
-                z=delta, xyz_coord='local'
-            ), tag='try_forward', is_save=is_save, delay=False)
             actor_pose = actor.get_pose()
             if np.linalg.norm(actor_pose.p - actor_last_pose.p) < np.abs(delta):
                 return False

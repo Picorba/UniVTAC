@@ -38,6 +38,7 @@ RUN --mount=type=cache,target=/var/cache/apt \
     git \
     wget \
     git-lfs \
+    ffmpeg \
     nano \
     tmux \
     pkg-config \
@@ -45,7 +46,7 @@ RUN --mount=type=cache,target=/var/cache/apt \
     unzip \
     ca-certificates && \
     apt -y autoremove && apt clean autoclean && \
-    rm -rf /var/lib/apt/lists/* 
+    rm -rf /var/lib/apt/lists/*
     # ffmpeg
     # libglew-dev \
     # freeglut3-dev \
@@ -111,29 +112,3 @@ ENV CMAKE_TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake
 WORKDIR ${ISAACLAB_EXTENSION_TEMPLATE_PATH}
 
 ENV HEADLESS=0
-
-
- Attempting uninstall: setuptools
-    Found existing installation: setuptools 70.3.0
-    Uninstalling setuptools-70.3.0:
-      Successfully uninstalled setuptools-70.3.0
-  Attempting uninstall: sentry-sdk
-    Found existing installation: sentry-sdk 1.43.0
-    Uninstalling sentry-sdk-1.43.0:
-      Successfully uninstalled sentry-sdk-1.43.0
-  Attempting uninstall: packaging
-    Found existing installation: packaging 26.0
-    Uninstalling packaging-26.0:
-      Successfully uninstalled packaging-26.0
-  Attempting uninstall: numpy
-    Found existing installation: numpy 1.26.0
-    Uninstalling numpy-1.26.0:
-      Successfully uninstalled numpy-1.26.0
-  Attempting uninstall: huggingface-hub
-    Found existing installation: huggingface_hub 1.4.1
-    Uninstalling huggingface_hub-1.4.1:
-      Successfully uninstalled huggingface_hub-1.4.1
-  Attempting uninstall: wandb
-    Found existing installation: wandb 0.12.21
-    Uninstalling wandb-0.12.21:
-      Successfully uninstalled wandb-0.12.21

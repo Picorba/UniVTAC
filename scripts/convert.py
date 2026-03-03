@@ -113,7 +113,7 @@ from isaaclab.sim.utils import export_prim_to_file
 
 from pathlib import Path
 from pxr import Usd, Sdf, Gf
-from utils.mesh_gen import MeshGenerator, TetMeshCfg
+from scripts.utils.mesh_gen import MeshGenerator, TetMeshCfg
 
 def visualize_tet(tet_points, tet_indices, is_save=False):
     import trimesh
@@ -362,7 +362,6 @@ class MeshConverter(AssetConverterBase):
             
             # points, triangles = msh.vertices, msh.faces
             points, triangles = v_clean, f_clean
-            trimesh.Scene([trimesh.Trimesh(vertices=points, faces=triangles.reshape(-1, 3))]).show()
 
             tg = tetgen.TetGen(points, triangles)
             tg.tetrahedralize()
@@ -379,9 +378,19 @@ class MeshConverter(AssetConverterBase):
                 progress_bar=False
             )
             faces = surface_polydata.faces
-            surf_faces = faces.reshape(-1, 4)[:, 1:4]   # 取每行的后三个顶点索引
-            surf_indices = surf_faces.flatten().tolist()
-            surf_points = np.array(surface_polydata.points).tolist()
+            surf_faces = faces.reshape(-1, 4)[:, 1:4]
+            raw_surf_points = np.array(surface_polydata.points)
+            raw_surf_indices = surf_faces.astype(np.int32)
+
+            # Clean the TetGen-extracted surface to remove self-intersections
+            surf_points_clean, surf_faces_clean = pymeshfix.clean_from_arrays(
+                raw_surf_points,
+                raw_surf_indices,
+                joincomp=False,
+                remove_smallest_components=False
+            )
+            surf_indices = surf_faces_clean.flatten().tolist()
+            surf_points = surf_points_clean.tolist()
             return tet_points, tet_indices, surf_points, surf_indices
         else:
             mesh_gen = MeshGenerator(config=TetMeshCfg(

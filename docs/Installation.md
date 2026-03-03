@@ -150,3 +150,55 @@ python ./scripts/benchmarking/tactile_sim_performance/run_ball_rolling_experimen
 ### Step 4: Install cuRobo
 
 cuRobo is used for GPU-accelerated collision-aware motion planning. Follow the official [cuRobo Installation Guide](https://curobo.org/get_started/1_install_instructions.html).
+
+---
+
+## Docker Installation
+
+As an alternative to the local setup above, UniVTAC provides a Docker image that bundles Isaac Sim, Isaac Lab, TacEx, and cuRobo.
+
+### Prerequisites
+
+- [Docker](https://docs.docker.com/engine/install/) with the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
+- A pre-built `isaac-lab-base` image (follow the [Isaac Lab Docker guide](https://isaac-sim.github.io/IsaacLab/main/source/deployment/docker.html))
+
+### Build the Image
+
+From the repository root:
+
+```bash
+./docker/container.py build
+```
+
+This will:
+1. Install system dependencies (`git-lfs`, `ffmpeg`, build tools, cmake, vcpkg)
+
+
+### Setup the Container
+
+```bash
+./docker/container.py start
+./docker/container.py enter
+cd third_party/TacEx/
+./tacex.sh -i all
+
+```
+
+Install curobo
+```bash
+cd ../..
+git clone https://github.com/NVlabs/curobo.git
+cd curobo
+pip install -e . --no-build-isolation
+python -m pip install transforms3d
+```
+Check the data collection script :
+```bash
+python scripts/collect_data.py     lift_bottle demo     --start_seed 1     --max_seed 1     --episode_num 1     --gpu 0
+```
+Then you can test using the data collection scripts.
+### Stop the Container
+
+```bash
+./docker/container.py stop
+```

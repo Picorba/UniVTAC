@@ -287,7 +287,10 @@ def main():
     # 获取所有 HDF5 文件路径
     hdf5_dir = Path(load_dir) / 'hdf5'
     if not hdf5_dir.exists():
-        raise FileNotFoundError(f"HDF5 directory not found: {hdf5_dir}")
+        hdf5_dir = Path(load_dir)
+        if len(list(hdf5_dir.glob('*.hdf5'))) == 0:
+            print(f"HDF5 directory does not exist at \n{hdf5_dir}\n")
+            raise FileNotFoundError(f"HDF5 directory not found: {hdf5_dir}")
     
     hdf5_data_path = sorted(
         [i for i in hdf5_dir.glob('*.hdf5')],

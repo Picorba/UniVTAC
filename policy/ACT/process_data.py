@@ -38,8 +38,10 @@ def load_hdf5(dataset_paths, camera_type, downsample_factor):
 def data_transform(path, episode_num, save_path):
     hdf5_dir = Path(path) / 'hdf5'
     if not hdf5_dir.exists():
-        print(f"HDF5 directory does not exist at \n{hdf5_dir}\n")
-        exit()
+        hdf5_dir = Path(path)
+        if len(list(hdf5_dir.glob('*.hdf5'))) == 0:
+            print(f"HDF5 directory does not exist at \n{hdf5_dir}\n")
+            raise FileNotFoundError(f"HDF5 directory not found: {hdf5_dir}")
     
     # 获取所有 episode 文件
     hdf5_files = sorted(hdf5_dir.glob('*.hdf5'), key=lambda x: int(x.stem))

@@ -84,7 +84,7 @@ def replay(task: 'BaseTask', seed, data_root:Path):
     for idx in np.arange(0, qpos_list.shape[0], 2):
         action = qpos_list[idx]
 
-        exec_succ, eval_succ = task.take_action(action, action_type='qpos', force=False)
+        exec_succ, eval_succ = task.take_action(action, action_type='qpos', force=True)
         observation = task._get_observations()
         arm_dis = torch.abs(action[:7] - observation['embodiment']['joint'][:7])
         gripper_dis = torch.abs(action[7] - observation['embodiment']['joint'][7:])

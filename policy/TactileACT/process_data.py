@@ -84,14 +84,21 @@ def process_episodes_batch(hdf5_paths, save_dir):
     data_paths = [
         'embodiment/joint',
         'embodiment/ee',
-        'tactile/left_tactile/rgb_marker',
-        'tactile/right_tactile/rgb_marker',
     ]
     if camera_type == 'all':
         data_paths.append(f'observation/head/rgb')
         data_paths.append(f'observation/wrist/rgb')
     else:
-        data_paths.append(f'observation/{camera_type}/rgb')
+        data_paths.append(f'observation/{camera_type}/rgb')    
+
+    with h5py.File(str(hdf5_paths[0]), 'r') as f:
+        try:
+            f['tactile/left_tactile/rgb_marker']
+            data_paths.append('tactile/left_tactile/rgb_marker')
+            data_paths.append('tactile/right_tactile/rgb_marker')
+        except:
+            data_paths.append('tactile/left_gsmini/rgb_marker')
+            data_paths.append('tactile/right_gsmini/rgb_marker')
 
     batch_data = handler.batch_gather_hdf5(
         [str(p) for p in hdf5_paths],

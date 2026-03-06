@@ -15,14 +15,21 @@ from envs.utils.data import HDF5Handler
 def load_hdf5(dataset_paths, camera_type, downsample_factor):
     data_paths = [
         'embodiment/joint',
-        'tactile/left_tactile/rgb_marker',
-        'tactile/right_tactile/rgb_marker',
     ]
     if camera_type == 'all':
         data_paths.append(f'observation/head/rgb')
         data_paths.append(f'observation/wrist/rgb')
     else:
         data_paths.append(f'observation/{camera_type}/rgb')
+    
+    with h5py.File(str(dataset_paths[0]), 'r') as f:
+        try:
+            f['tactile/left_tactile/rgb_marker']
+            data_paths.append('tactile/left_tactile/rgb_marker')
+            data_paths.append('tactile/right_tactile/rgb_marker')
+        except:
+            data_paths.append('tactile/left_gsmini/rgb_marker')
+            data_paths.append('tactile/right_gsmini/rgb_marker')
 
     data = HDF5Handler().batch_gather_hdf5(
         dataset_paths,

@@ -17,7 +17,7 @@ import subprocess
 import sys
 import toml
 
-from setuptools import Extension, setup
+from setuptools import Extension, find_packages, setup
 from setuptools.command.build_ext import build_ext
 
 # Obtain the extension data from the extension.toml file
@@ -104,7 +104,7 @@ class CMakeBuild(build_ext):
 # Installation operation
 setup(
     name="tacex_uipc",
-    packages=["tacex_uipc"],
+    packages=find_packages(),
     author=EXTENSION_TOML_DATA["package"]["author"],
     maintainer=EXTENSION_TOML_DATA["package"]["maintainer"],
     url=EXTENSION_TOML_DATA["package"]["repository"],

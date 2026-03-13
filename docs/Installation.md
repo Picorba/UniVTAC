@@ -165,13 +165,12 @@ As an alternative to the local setup above, UniVTAC provides a Docker image that
 ### Build the Image
 
 From the repository root:
-
+Add in the docker/.env.base file this line :
+CMAKE_CUDA_ARCHITECTURES=#yourarchitecture
 ```bash
+git clone https://github.com/NVlabs/curobo
 ./docker/container.py build
 ```
-
-This will:
-1. Install system dependencies (`git-lfs`, `ffmpeg`, build tools, cmake, vcpkg)
 
 
 ### Setup the Container

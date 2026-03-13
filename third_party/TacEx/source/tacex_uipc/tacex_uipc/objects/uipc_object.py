@@ -188,6 +188,14 @@ class UipcObject(AssetBase):
             tet_indices = np.array(tet_indices).reshape(-1, 4)
             tet_surf_indices = np.array(tet_surf_indices).reshape(-1, 3)
 
+            print(
+                f"Created tet data:\n"
+                f"  tet_points       (num {tet_points.shape[0]})\n"
+                f"  tet_indices      (num {tet_indices.shape[0]})\n"
+                f"  tet_surf_points  (num {surf_points.shape[0]})\n"
+                f"  tet_surf_indices (num {tet_surf_indices.shape[0]})"
+            )
+
             # create uipc mesh
             mesh = tetmesh(tet_points_world.copy(), tet_indices.copy())
             # enable the contact by labeling the surface

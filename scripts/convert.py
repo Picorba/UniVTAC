@@ -75,6 +75,20 @@ parser.add_argument(
     '--show', action='store_true',
     help='Show trimesh visualization of the generated tetrahedral mesh.'
 )
+parser.add_argument(
+    '--edge-length-r',
+    type=float,
+    default=0.25,
+    help='Relative edge length for tet mesh (smaller = finer). Default 0.25 matches UI converter.'
+)
+parser.add_argument(
+    '--backend',
+    type=str,
+    choices=["ftetwild","tetgen"],
+    default="ftetwild",
+    help="Backend to use for the tet mesh gen"
+)
+
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 # parse the arguments
@@ -283,7 +297,8 @@ class MeshConverter(AssetConverterBase):
                 continue
             # add tet information
             usd_mesh = UsdGeom.Mesh(child_mesh_prim)
-            tet_points, tet_indices, surf_points, tet_surf_indices = self.gen_tet(usd_mesh, backend='tetgen')
+            global args_cli
+            tet_points, tet_indices, surf_points, tet_surf_indices = self.gen_tet(usd_mesh, backend=args_cli.backend)
             print('total tet points:', len(tet_points), ' total tets:', len(tet_indices) // 4)
             self.set_attr(
                 child_mesh_prim, 'tet_points',
@@ -302,7 +317,6 @@ class MeshConverter(AssetConverterBase):
                 Sdf.ValueTypeNames.UIntArray, tet_surf_indices
             )
             
-            global args_cli
             if args_cli.show:
                 visualize_tet(tet_points, tet_indices)
 
@@ -396,8 +410,7 @@ class MeshConverter(AssetConverterBase):
             mesh_gen = MeshGenerator(config=TetMeshCfg(
                 stop_quality=6,
                 max_its=100,
-                # edge_length_r=0.01,
-                edge_length_r=0.02,
+                edge_length_r=args_cli.edge_length_r,
                 epsilon_r=0.01
             ))
             return mesh_gen.generate_tet_mesh_for_prim(

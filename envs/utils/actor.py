@@ -1,12 +1,15 @@
 from pathlib import Path
 from typing import Literal, Generator
 
+import torch
+import numpy as np
 from pxr import Sdf, UsdShade, UsdGeom
 
 import isaaclab.sim as sim_utils
 from isaaclab.utils.math import *
 from isaaclab.utils import configclass
-from isaaclab.assets import AssetBaseCfg
+from isaaclab.assets import AssetBaseCfg, RigidObject, RigidObjectCfg
+from isaaclab.sim.schemas.schemas_cfg import RigidBodyPropertiesCfg
 
 from tacex_uipc import (
     UipcObject,
@@ -240,10 +243,133 @@ class Actor(UipcObject):
         self.points[type].append(local_matrix)
         return len(self.points[type]) - 1
 
+class RigidActor:
+    """A PhysX rigid body actor wrapping Isaac Lab's RigidObject.
+
+    Exposes the same interface as Actor so it can be used transparently
+    in task scripts and Atom helpers.
+    """
+
+    def __init__(self, name: str, rigid_object: RigidObject):
+        self.name = name
+        self._rigid_object = rigid_object
+        self._contact_points: list = []
+        self._target_points: list = []
+        self._functional_points: list = []
+        self._orientation_points: list = []
+
+    @classmethod
+    def from_usd_file(
+        cls,
+        name: str,
+        asset_path,
+        pose: 'Pose',
+        density: float = 1e3,
+        scale=None,
+    ):
+        asset_path = Path(asset_path)
+        if not asset_path.is_absolute():
+            asset_path = OBJECTS_ROOT / asset_path
+        asset_path = str(asset_path.absolute())
+
+        rigid_props = RigidBodyPropertiesCfg(
+            solver_position_iteration_count=16,
+            solver_velocity_iteration_count=1,
+            max_angular_velocity=1000.0,
+            max_linear_velocity=1000.0,
+            max_depenetration_velocity=5.0,
+        )
+        spawn_cfg = sim_utils.UsdFileCfg(
+            usd_path=asset_path,
+            mass_props=sim_utils.MassPropertiesCfg(density=density),
+            rigid_props=rigid_props,
+            scale=scale,
+        )
+        cfg = RigidObjectCfg(
+            prim_path=f"/World/envs/env_.*/{name}",
+            init_state=RigidObjectCfg.InitialStateCfg(pos=tuple(pose.p), rot=tuple(pose.q)),
+            spawn=spawn_cfg,
+        )
+        rigid_object = RigidObject(cfg)
+        return cls(name, rigid_object)
+
+    def get_pose(self, type: Literal['pose', 'matrix'] = 'pose'):
+        pos = self._rigid_object.data.root_pos_w[0].cpu().numpy()
+        quat = self._rigid_object.data.root_quat_w[0].cpu().numpy()
+        pose = Pose(pos, quat)
+        if type == 'matrix':
+            return pose.to_transformation_matrix()
+        return pose
+
+    def set_pose(self, pose: 'Pose'):
+        device = self._rigid_object._device
+        pos = torch.tensor(pose.p, dtype=torch.float32, device=device).unsqueeze(0)
+        quat = torch.tensor(pose.q, dtype=torch.float32, device=device).unsqueeze(0)
+        root_pose = torch.cat([pos, quat], dim=-1)
+        self._rigid_object.write_root_pose_to_sim(root_pose)
+        root_vel = torch.zeros(1, 6, dtype=torch.float32, device=device)
+        self._rigid_object.write_root_velocity_to_sim(root_vel)
+
+    def remove_animate(self):
+        pass  # no animation constraints for rigid bodies
+
+    def update(self, dt: float):
+        self._rigid_object.update(dt)
+
+    def set_texture(self, mdl_path: str, rng=None):
+        prim_path = f'/World/envs/env_0/{self.name}'
+        Actor._set_texture(prim_path, mdl_path, rng=rng)
+
+    @property
+    def points(self):
+        return {
+            'contact': self._contact_points,
+            'target': self._target_points,
+            'functional': self._functional_points,
+            'orientation': self._orientation_points,
+        }
+
+    def get_point(
+        self,
+        type: Literal['contact', 'target', 'functional', 'orientation'],
+        idx: int,
+        ret: Literal['pose', 'matrix'] = 'pose',
+    ):
+        points = self.points[type]
+        if idx >= len(points):
+            raise IndexError(f"Index {idx} out of range for {type} points.")
+        local_matrix = points[idx]
+        actor_matrix = self.get_pose('matrix')
+        world_matrix = actor_matrix @ local_matrix
+        if ret == 'matrix':
+            return world_matrix
+        return Pose.from_matrix(world_matrix)
+
+    def iter_point(
+        self,
+        type: Literal['contact', 'target', 'functional', 'orientation'],
+        ret: Literal['pose', 'matrix'] = 'pose',
+    ) -> Generator:
+        points = self.points[type]
+        for idx in range(len(points)):
+            yield self.get_point(type, idx, ret)
+
+    def register_point(
+        self,
+        pose: 'Pose',
+        type: Literal['contact', 'target', 'functional', 'orientation'],
+    ):
+        actor_matrix = self.get_pose('matrix')
+        world_matrix = pose.to_transformation_matrix()
+        local_matrix = np.linalg.inv(actor_matrix) @ world_matrix
+        self.points[type].append(local_matrix)
+        return len(self.points[type]) - 1
+
+
 class ActorManager:
     def __init__(self, task: 'BaseTask'):
         self.task = task
-        self.actors: dict[str, Actor] = {}
+        self.actors: dict[str, Actor | RigidActor] = {}
 
     def add_from_usd_file(self, name:str, asset_path:str, pose:Pose, constitution_cfg=None, density=1e3, scale=None):
         actor = Actor.from_usd_file(
@@ -252,21 +378,27 @@ class ActorManager:
         )
         self.actors[actor.cfg.name] = actor
         return actor
-    
+
+    def add_rigid_from_usd_file(self, name: str, asset_path: str, pose: Pose, density: float = 1e3, scale=None):
+        """Spawn a plain PhysX rigid body (no UIPC FEM) from a USD file."""
+        actor = RigidActor.from_usd_file(name, asset_path, pose, density=density, scale=scale)
+        self.actors[name] = actor
+        return actor
+
     def _reset_idx(self, rng=None):
         for actor in self.actors.values():
             # actor.write_vertex_positions_to_sim(vertex_positions=actor.init_vertex_pos)
             if self.task.cfg.random_texture:
                 actor.set_texture('random', rng=rng)
- 
+
     def update(self, dt):
         for actor in self.actors.values():
             actor.update(dt=dt)
-    
+
     def remove_animate(self):
         for actor in self.actors.values():
             actor.remove_animate()
-    
+
     def get_observations(self):
         obs = {}
         for name, actor in self.actors.items():

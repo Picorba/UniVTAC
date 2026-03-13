@@ -178,18 +178,12 @@ git clone https://github.com/NVlabs/curobo
 ```bash
 ./docker/container.py start
 ./docker/container.py enter
-cd third_party/TacEx/
-./tacex.sh -i all
 
-```
-
-Install curobo
-```bash
-cd ../..
-git clone https://github.com/NVlabs/curobo.git
-cd curobo
-pip install -e . --no-build-isolation
-python -m pip install transforms3d
+pip install pip==23
+pip install setuptools==65
+pip install flatdict
+cd ../isaaclab
+./isaaclab.sh --install
 ```
 Check the data collection script :
 ```bash

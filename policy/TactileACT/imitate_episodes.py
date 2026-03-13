@@ -9,19 +9,17 @@ from copy import deepcopy
 from tqdm import tqdm
 from einops import rearrange
 
-from utils import get_norm_stats, EpisodicDataset, EpisodicDatasetDelta # data functions
+from utils import get_norm_stats, EpisodicDataset # data functions
 from utils import compute_dict_mean, set_seed, detach_dict # helper functions
 from policy import ACTPolicy
-from visualization_utils import visualize_data, debug
+from visualization_utils import debug
 
-from typing import List, Dict, Tuple, Any
-from pathlib import Path
+from typing import List, Dict, Any
 import json
 
 import IPython
 e = IPython.embed
 
-import cv2
 
 # from visualization_utils import visualise_trajectory, z_slider
 

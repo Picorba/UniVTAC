@@ -84,14 +84,23 @@ def process_episodes_batch(hdf5_paths, save_dir):
     data_paths = [
         'embodiment/joint',
         'embodiment/ee',
-        'tactile/left_tactile/rgb_marker',
-        'tactile/right_tactile/rgb_marker',
     ]
     if camera_type == 'all':
         data_paths.append(f'observation/head/rgb')
         data_paths.append(f'observation/wrist/rgb')
     else:
-        data_paths.append(f'observation/{camera_type}/rgb')
+        data_paths.append(f'observation/{camera_type}/rgb')    
+
+    with h5py.File(str(hdf5_paths[0]), 'r') as f:
+        try:
+            f['tactile/left_tactile/rgb_marker']
+            left_tac_key = 'tactile/left_tactile/rgb_marker'
+            right_tac_key = 'tactile/right_tactile/rgb_marker'
+        except:
+            left_tac_key = 'tactile/left_gsmini/rgb_marker'
+            right_tac_key = 'tactile/right_gsmini/rgb_marker'
+    data_paths.append(left_tac_key)
+    data_paths.append(right_tac_key)
 
     batch_data = handler.batch_gather_hdf5(
         [str(p) for p in hdf5_paths],
@@ -117,8 +126,8 @@ def process_episodes_batch(hdf5_paths, save_dir):
         head_cam = batch_data[f'observation/head/rgb']  # (N, H, W, 3)
     else:
         head_cam = batch_data[f'observation/{camera_type}/rgb']  # (N, H, W, 3)
-    left_tac = batch_data['tactile/left_tactile/rgb_marker']  # (N, H, W, 3)
-    right_tac = batch_data['tactile/right_tactile/rgb_marker']  # (N, H, W, 3)
+    left_tac = batch_data[left_tac_key]  # (N, H, W, 3)
+    right_tac = batch_data[right_tac_key]  # (N, H, W, 3)
     
     successful_count = 0
     start_idx = 0
@@ -287,7 +296,10 @@ def main():
     # 获取所有 HDF5 文件路径
     hdf5_dir = Path(load_dir) / 'hdf5'
     if not hdf5_dir.exists():
-        raise FileNotFoundError(f"HDF5 directory not found: {hdf5_dir}")
+        hdf5_dir = Path(load_dir)
+        if len(list(hdf5_dir.glob('*.hdf5'))) == 0:
+            print(f"HDF5 directory does not exist at \n{hdf5_dir}\n")
+            raise FileNotFoundError(f"HDF5 directory not found: {hdf5_dir}")
     
     hdf5_data_path = sorted(
         [i for i in hdf5_dir.glob('*.hdf5')],
@@ -317,4 +329,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

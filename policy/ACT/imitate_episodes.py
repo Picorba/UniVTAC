@@ -140,7 +140,7 @@ def forward_pass(data, policy):
         action_data.cuda(),
         is_pad.cuda(),
     )
-    return policy(qpos_data, cam_data, tac_data, action_data, is_pad)  # TODO remove None
+    return policy(qpos_data, cam_data, tac_data, action_data, is_pad)
 
 
 def train_bc(train_dataloader, val_dataloader, config):

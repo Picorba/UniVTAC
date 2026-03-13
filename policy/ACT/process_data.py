@@ -15,8 +15,8 @@ from envs.utils.data import HDF5Handler
 def load_hdf5(dataset_paths, camera_type, downsample_factor):
     data_paths = [
         'embodiment/joint',
-        'tactile/left_tactile/rgb_marker',
-        'tactile/right_tactile/rgb_marker',
+        'tactile/left_gsmini/rgb_marker',
+        'tactile/right_gsmini/rgb_marker',
     ]
     if camera_type == 'all':
         data_paths.append(f'observation/head/rgb')
@@ -36,10 +36,7 @@ def load_hdf5(dataset_paths, camera_type, downsample_factor):
 
 
 def data_transform(path, episode_num, save_path):
-    hdf5_dir = Path(path) / 'hdf5'
-    if not hdf5_dir.exists():
-        print(f"HDF5 directory does not exist at \n{hdf5_dir}\n")
-        exit()
+    hdf5_dir = Path(path)
     
     # 获取所有 episode 文件
     hdf5_files = sorted(hdf5_dir.glob('*.hdf5'), key=lambda x: int(x.stem))
@@ -61,15 +58,16 @@ def data_transform(path, episode_num, save_path):
     data = load_hdf5(dataset_paths[:episode_num], camera_type, downsample_factor)
     
     # 提取批量数据
-    joint_state_all = data['embodiment/joint_state'][:, 0:8]  # (T_total, 8)
-    joint_action_all = data['embodiment/joint_action'][:, 0:8]  # (T_total, 8)
+    joint_state_all = data['embodiment/joint_state'][:, 0:8]
+    joint_action_all = data['embodiment/joint_action'][:, 0:8]
+
     if camera_type == 'all':
         head_cam_all = data[f'observation/head/rgb']  # (T_total, H, W, 3)
         wrist_cam_all = data[f'observation/wrist/rgb']  # (T_total, H, W, 3)
     else:
         head_cam_all = data[f'observation/{camera_type}/rgb']  # (T_total, H, W, 3)
-    left_tac_all = data['tactile/left_tactile/rgb_marker']  # (T_total, H, W, 3)
-    right_tac_all = data['tactile/right_tactile/rgb_marker']  # (T_total, H, W, 3)
+    left_tac_all = data['tactile/left_gsmini/rgb_marker']  # (T_total, H, W, 3)
+    right_tac_all = data['tactile/right_gsmini/rgb_marker']  # (T_total, H, W, 3)
     episode_ends = data['episode_ends']
     
     start_idx = 0
@@ -124,7 +122,7 @@ if __name__ == "__main__":
 
     input_path = os.path.join("../../data/", task_name, task_config)
     output_path = f"./data/sim-{task_name}/{task_config}-{expert_data_num}"
-    
+    print(f"Looking for data in {input_path}")
     begin, cam_type = data_transform(input_path, expert_data_num, output_path)
 
     SIM_TASK_CONFIGS_PATH = "./SIM_TASK_CONFIGS.json"

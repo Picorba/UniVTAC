@@ -4,10 +4,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from .._base_policy import BasePolicy
 
-import os
-import cv2
 import json
-import numpy as np
 import torch
 from .policy import ACT
 from torchvision import transforms

@@ -57,3 +57,6 @@ textures.zip
 curobo/
 ${data}/
 *.sif
+*.obj
+*.mtl
+*.pth

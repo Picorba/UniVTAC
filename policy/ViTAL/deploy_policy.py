@@ -114,4 +114,4 @@ class Policy(BasePolicy):
         font = ImageFont.load_default()
 
         draw.text((obs.width-100, obs.height-60), f'{t:03d}', fill=(255, 0, 0), font=font)
-        obs.save(f'TactileACT_{self.task_name}.png')
+        obs.save(f'ViTAL_{self.task_name}.png')

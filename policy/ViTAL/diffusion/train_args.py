@@ -23,14 +23,14 @@ START_TIME = datetime.now()
 # # NOT FIXED DATASET
 DATA_TYPE = "NOT_FIXED"
 # CKPT_DIR = '/home/selam/checkpoints/'
-CKPT_DIR = 'policy/TactileACT/dp-ckpt'
+CKPT_DIR = 'policy/ViTAL/dp-ckpt'
 #for pretrained clip head
 # GELSIGHT_WEIGHTS_PATH = '/home/selam/data/camera_cage_new_notfixed/clip_models/trained/epoch_1499_gelsight_encoder.pth'
 # IMAGE_WEIGHTS_PATH = '/home/selam/data/camera_cage_new_notfixed/clip_models/trained/epoch_1499_vision_encoder.pth'
 # DATA_DIR = "/home/selam/data/camera_cage_new_notfixed/data"
-GELSIGHT_WEIGHTS_PATH = 'policy/TactileACT/clip_models/insert_hole-clean-50/0/epoch_1499_gelsight_encoder.pth'
-IMAGE_WEIGHTS_PATH = 'policy/TactileACT/clip_models/insert_hole-clean-50/0/epoch_1499_vision_encoder.pth'
-DATA_DIR = 'policy/TactileACT/data'
+GELSIGHT_WEIGHTS_PATH = 'policy/ViTAL/clip_models/insert_hole-clean-50/0/epoch_1499_gelsight_encoder.pth'
+IMAGE_WEIGHTS_PATH = 'policy/ViTAL/clip_models/insert_hole-clean-50/0/epoch_1499_vision_encoder.pth'
+DATA_DIR = 'policy/ViTAL/data'
 # CODE_START_DIR = '/home/selam/diffusion_plugging/'
 ENC_TYPE = 'clip'  # weights above not actually used here
 DEVICE_STR = 'cuda:4'

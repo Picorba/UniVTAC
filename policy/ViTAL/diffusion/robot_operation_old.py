@@ -140,9 +140,9 @@ if __name__ == '__main__':
     pose_controller = GotoPoseLive(step_size=0.05)
     pose_controller.set_goal_pose(move_pose)
 
-    model_path = "/home/abraham/TactileACT/data/delta_1999_no_pretraining/policy_last.ckpt"
-    save_video_path = "/home/abraham/TactileACT/data/delta_1999_no_pretraining/videos/"
-    args_file = "/home/abraham/TactileACT/data/delta_1999_no_pretraining/args.json"
+    model_path = "/home/abraham/ViTAL/data/delta_1999_no_pretraining/policy_last.ckpt"
+    save_video_path = "/home/abraham/ViTAL/data/delta_1999_no_pretraining/videos/"
+    args_file = "/home/abraham/ViTAL/data/delta_1999_no_pretraining/args.json"
 
     """# pretend to be a robot by loading a dataset
     data_dir = "/mnt/ssd/abraham/Tactile_ACT_Data/camara_cage_1/run_0/episode_3/episode_3.hdf5"
@@ -200,7 +200,7 @@ if __name__ == '__main__':
     # stack the weights to the correct shape
 
     # # pretend to be a robot by loading a dataset
-    # data_dir = "//home/aigeorge/research/TactileACT/data/original/camara_cage_1/run_0/episode_3/episode_3.hdf5"
+    # data_dir = "//home/aigeorge/research/ViTAL/data/original/camara_cage_1/run_0/episode_3/episode_3.hdf5"
     # with h5py.File(data_dir, 'r') as root:
     #     qpos = root['/observations/position'][()]
     #     gt_actions = root['/goal_position'][()]

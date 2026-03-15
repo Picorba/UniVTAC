@@ -4,7 +4,7 @@ ACT Data Preprocessing for TacArena (Optimized)
 Efficiently processes multiple episodes by leveraging batch_gather_hdf5
 - Uses episode_ends for efficient per-episode data splitting
 - Computes normalization statistics on-the-fly during processing
-- Per-episode HDF5 output format compatible with TactileACT
+- Per-episode HDF5 output format compatible with ViTAL
 """
 
 import os
@@ -164,7 +164,7 @@ def process_episodes_batch(hdf5_paths, save_dir):
 
 
 def _save_episode_hdf5(output_path, qpos, action, ee, head_cam, left_tac, right_tac, wrist=None):
-    """保存单个 episode 到 HDF5 文件（TactileACT 格式）"""
+    """保存单个 episode 到 HDF5 文件（ViTAL 格式）"""
     with h5py.File(output_path, 'w') as f:
         # 保存动作 (T, 8)
         f.create_dataset(

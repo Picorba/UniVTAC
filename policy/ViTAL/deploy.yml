@@ -1,5 +1,5 @@
 # Basic experiment configuration
-policy_name: TactileACT
+policy_name: ViTAL
 task_name: insert_lean
 task_config: demo
 seed: 0
@@ -34,7 +34,7 @@ position_embedding: sine
 instruction_type: seen
 instuction_file: insert_lean
 
-# TactileACT result
+# ViTAL result
 eval: false
 checkpoint: "policy_best"
 onscreen_render: false

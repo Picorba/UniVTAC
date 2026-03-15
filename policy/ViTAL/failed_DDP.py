@@ -736,6 +736,6 @@ if __name__ == "__main__":
     world_size = 8
     mp.spawn(run_clip_pretraining, args=(world_size,), nprocs=world_size, join=True)
     # run_clip_pretraining()
-    # training_losses = np.load('/home/aigeorge/research/TactileACT/data/camera_cage_new_mount/clip_models/11/epoch1450-training_losses.npy')[:1450]
-    # testing_losses = np.load('/home/aigeorge/research/TactileACT/data/camera_cage_new_mount/clip_models/11/epoch1450-testing_losses.npy')[:1450]
+    # training_losses = np.load('/home/aigeorge/research/ViTAL/data/camera_cage_new_mount/clip_models/11/epoch1450-training_losses.npy')[:1450]
+    # testing_losses = np.load('/home/aigeorge/research/ViTAL/data/camera_cage_new_mount/clip_models/11/epoch1450-testing_losses.npy')[:1450]
     # replot_loss_graph(training_losses, testing_losses)

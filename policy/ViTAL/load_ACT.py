@@ -71,8 +71,8 @@ def load_ACT(model_path, args_file:str = None) -> ACTPolicy:
     return act
 
 if __name__ == '__main__':
-    model_path = "/home/aigeorge/research/TactileACT/data/camera_cage/pretrained_1999_melted/policy_last.ckpt"
-    args_file = "/home/aigeorge/research/TactileACT/data/camera_cage/pretrained_1999_melted_0/args.json"
+    model_path = "/home/aigeorge/research/ViTAL/data/camera_cage/pretrained_1999_melted/policy_last.ckpt"
+    args_file = "/home/aigeorge/research/ViTAL/data/camera_cage/pretrained_1999_melted_0/args.json"
     act = load_ACT(model_path)
     print(act)
     print('Done')

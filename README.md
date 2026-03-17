@@ -37,7 +37,7 @@ UniVTAC includes several baseline policies implemented under the `policy/` direc
 
 - ACT: Action Chunking with Transformers with/without tactile inputs
 - Abation: ACT ablation variants for modality comparison
-- TactileACT: ACT with CLIP-pretrained tactile-vision encoders in ViTAL
+- ViTAL: ACT with CLIP-pretrained tactile-vision encoders in ViTAL
 
 Each policy is a self-contained module under `policy/` with its own data processing, training, and deployment scripts. All policies share a unified evaluation entry point at the project root:
 

@@ -1,8 +1,8 @@
 import os
 import shutil
 
-source_file = "/home/aigeorge/TactileACT/data/camera_cage_not_fixed/data"
-desitination_file = "/home/aigeorge/TactileACT/data/camera_cage_both/data"
+source_file = "/home/aigeorge/ViTAL/data/camera_cage_not_fixed/data"
+desitination_file = "/home/aigeorge/ViTAL/data/camera_cage_both/data"
 
 # loop through ever hdf5 file in the source directory, and copy it to the destination directory with a new name.
 

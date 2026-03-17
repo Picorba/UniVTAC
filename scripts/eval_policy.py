@@ -7,7 +7,6 @@ sys.path.append(f"./policy")
 import time
 import json
 import yaml
-import torch
 import argparse
 import traceback
 from pathlib import Path
@@ -62,7 +61,8 @@ AppLauncher.add_app_launcher_args(parser)
 # parse the arguments
 args_cli = parser.parse_args()
 args_cli.enable_cameras = True
-args_cli.livestream = 2
+args_cli.livestream = 0
+args_cli.headless = False
 args_cli.num_envs = 1
 
 # launch omniverse app, must done before importing anything from omni.isaac
@@ -212,8 +212,9 @@ def main():
         instructions = {'seen': ['Empty'], 'unseen': ['Empty']}
 
     task_module = importlib.import_module(f"envs.{task_file_name}")
+
     policy_module = importlib.import_module(f"policy.{policy_name}")
-    
+
     curr_time = time.strftime(r'%Y-%m-%d_%H:%M:%S')
 
     env_cfg:BaseTaskCfg = task_module.TaskCfg()
@@ -247,7 +248,9 @@ def main():
     log(f"Eval Config: {json.dumps(deploy_config, ensure_ascii=False, indent=4)}\n{'-' * 20}\n") 
     log(f"Task init finish in {task_init_cost:.2f} seconds.")
     log(f"Policy init finish in {policy_init_cost:.2f} seconds.")
-
+    log(f"policy_module {policy_module}")
+    log(f"task_module {task_module}")
+    
     results = eval_policy(
         task=task, policy=policy,
         expert_check=args_cli.expert_check,

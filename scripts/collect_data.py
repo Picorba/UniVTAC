@@ -106,7 +106,7 @@ def log(msg):
 def run(task: 'BaseTask', episode_num, use_seed, start_seed, max_seed):
     suc_num, seed = 0, 0
     suc_map = []
-    
+    number_seed = start_seed - start_seed + 1
     if start_seed != -1:
         seed = start_seed
         log(f"Starting from seed {seed}.")
@@ -153,7 +153,7 @@ def run(task: 'BaseTask', episode_num, use_seed, start_seed, max_seed):
         
         seed += 1
     
-    log(f'Complete collection, success rate: {suc_num}/{seed} ({(suc_num / seed) * 100:.2f}%)')
+    log(f'Complete collection, success rate: {suc_num}/{number_seed} ({(suc_num / number_seed) * 100:.2f}%)')
 
     task.close()
     simulation_app.close()

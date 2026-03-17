@@ -6,9 +6,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 from .._base_policy import BasePolicy
 
 import os
-import cv2
 import yaml
-import numpy as np
 import torch
 from .act_policy import ACT
 # from act_policy import ACT
@@ -20,7 +18,7 @@ class Policy(BasePolicy):
         """Initialize ACT policy for TacArena deployment"""
         # Construct checkpoint directory path
         self.train_config_name = os.environ.get('TRAIN_CONFIG', 'train_config')
-        self.ep_num = os.environ.get('EP_NUM', '50')
+        self.ep_num = os.environ.get('EP_NUM', '100')
         ckpt_dir = Path(__file__).parent / "act_ckpt" / f"act-{args['task_name']}" / f"{args['task_config']}-{self.ep_num}" / self.train_config_name
  
         self.task_name = args['task_name']
@@ -84,8 +82,8 @@ class Policy(BasePolicy):
         else:
             cam_high = camera_transform(observation["observation"][self.camera_type]["rgb"])
 
-        left_tac = tactile_transform(observation["tactile"]["left_gsmini"]["rgb_marker"])
-        right_tac = tactile_transform(observation["tactile"]["right_gsmini"]["rgb_marker"])
+        left_tac = tactile_transform(observation["tactile"]["left_tactile"]["rgb_marker"])
+        right_tac = tactile_transform(observation["tactile"]["right_tactile"]["rgb_marker"])
         
         # Extract joint positions (8D: 7 arm + 1 gripper)
         qpos = observation["embodiment"]["joint"][:8]

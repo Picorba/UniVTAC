@@ -22,4 +22,4 @@ bash train.sh $task_name $task_config $expert_data_num $gpu_id
 
 # 执行评估部分
 cd ../../
-bash eval_policy.sh $task_name $task_config TactileACT/deploy $gpu_id
+bash eval_policy.sh $task_name $task_config ViTAL/deploy $gpu_id

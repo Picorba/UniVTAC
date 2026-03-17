@@ -4,7 +4,7 @@ ACT Data Preprocessing for TacArena (Optimized)
 Efficiently processes multiple episodes by leveraging batch_gather_hdf5
 - Uses episode_ends for efficient per-episode data splitting
 - Computes normalization statistics on-the-fly during processing
-- Per-episode HDF5 output format compatible with TactileACT
+- Per-episode HDF5 output format compatible with ViTAL
 """
 
 import os
@@ -94,6 +94,7 @@ def process_episodes_batch(hdf5_paths, save_dir):
     with h5py.File(str(hdf5_paths[0]), 'r') as f:
         try:
             f['tactile/left_tactile/rgb_marker']
+<<<<<<< HEAD:policy/TactileACT/process_data.py
             left_tac_key = 'tactile/left_tactile/rgb_marker'
             right_tac_key = 'tactile/right_tactile/rgb_marker'
         except:
@@ -101,6 +102,13 @@ def process_episodes_batch(hdf5_paths, save_dir):
             right_tac_key = 'tactile/right_gsmini/rgb_marker'
     data_paths.append(left_tac_key)
     data_paths.append(right_tac_key)
+=======
+            data_paths.append('tactile/left_tactile/rgb_marker')
+            data_paths.append('tactile/right_tactile/rgb_marker')
+        except:
+            data_paths.append('tactile/left_gsmini/rgb_marker')
+            data_paths.append('tactile/right_gsmini/rgb_marker')
+>>>>>>> refs/remotes/upstream/main:policy/ViTAL/process_data.py
 
     batch_data = handler.batch_gather_hdf5(
         [str(p) for p in hdf5_paths],
@@ -166,7 +174,7 @@ def process_episodes_batch(hdf5_paths, save_dir):
 
 
 def _save_episode_hdf5(output_path, qpos, action, ee, head_cam, left_tac, right_tac, wrist=None):
-    """保存单个 episode 到 HDF5 文件（TactileACT 格式）"""
+    """保存单个 episode 到 HDF5 文件（ViTAL 格式）"""
     with h5py.File(output_path, 'w') as f:
         # 保存动作 (T, 8)
         f.create_dataset(

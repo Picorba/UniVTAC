@@ -82,10 +82,10 @@ def save_images_from_hdf5_file(source_file, save_folder):
 
 import os
 if __name__ == "__main__":
-    filename = "/home/aigeorge/research/TactileACT/data/camera_cage_new_mount/data/episode_55.hdf5"
+    filename = "/home/aigeorge/research/ViTAL/data/camera_cage_new_mount/data/episode_55.hdf5"
 
-    folder = "/home/aigeorge/research/TactileACT/data/camera_cage_new_mount/data"
-    images_folder = "/home/aigeorge/research/TactileACT/data/camera_cage_new_mount/images"
+    folder = "/home/aigeorge/research/ViTAL/data/camera_cage_new_mount/data"
+    images_folder = "/home/aigeorge/research/ViTAL/data/camera_cage_new_mount/images"
     # all_files = []
     # for filename in os.listdir(folder):
     #     if filename.endswith(".hdf5"):

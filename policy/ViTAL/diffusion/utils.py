@@ -291,7 +291,7 @@ def set_seed(seed):
     np.random.seed(seed)
 
 if __name__ == "__main__":
-    dataset_dir = "/home/aigeorge/research/TactileACT/data/camera_cage_new_mount/data"
+    dataset_dir = "/home/aigeorge/research/ViTAL/data/camera_cage_new_mount/data"
     num_episodes = 101
     norm_stats = get_norm_stats(dataset_dir, num_episodes, use_existing=True, chunk_size=30)
     print(norm_stats)

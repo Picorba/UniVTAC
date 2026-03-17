@@ -84,15 +84,15 @@ if __name__ == "__main__":
     use_act = False # whether to use the encoders fine-tuned with ACT
 
     # clip model paths
-    image_encoder_path = "/home/aigeorge/research/TactileACT/data/camera_cage_new_mount/clip_models/normalized/4/epoch_1399_vision_encoder.pth"
-    image_projection_head_path = "/home/aigeorge/research/TactileACT/data/camera_cage_new_mount/clip_models/normalized/4/epoch_1399_vision_projection.pth"
-    gelsight_encoder_path = "/home/aigeorge/research/TactileACT/data/camera_cage_new_mount/clip_models/normalized/4/epoch_1399_gelsight_encoder.pth"
-    gelsight_projection_head_path = "/home/aigeorge/research/TactileACT/data/camera_cage_new_mount/clip_models/normalized/4/epoch_1399_gelsight_projection.pth"
+    image_encoder_path = "/home/aigeorge/research/ViTAL/data/camera_cage_new_mount/clip_models/normalized/4/epoch_1399_vision_encoder.pth"
+    image_projection_head_path = "/home/aigeorge/research/ViTAL/data/camera_cage_new_mount/clip_models/normalized/4/epoch_1399_vision_projection.pth"
+    gelsight_encoder_path = "/home/aigeorge/research/ViTAL/data/camera_cage_new_mount/clip_models/normalized/4/epoch_1399_gelsight_encoder.pth"
+    gelsight_projection_head_path = "/home/aigeorge/research/ViTAL/data/camera_cage_new_mount/clip_models/normalized/4/epoch_1399_gelsight_projection.pth"
 
     # ACT model path. Used if you want to examine the fine-tuned encoders
-    ACT_model_path = "/home/aigeorge/research/TactileACT/data/Final Trained Policies/Fixed/ACT/pretrain_both_20/policy_last.ckpt"
+    ACT_model_path = "/home/aigeorge/research/ViTAL/data/Final Trained Policies/Fixed/ACT/pretrain_both_20/policy_last.ckpt"
     
-    dataset_dir = "/home/aigeorge/research/TactileACT/data/camera_cage_new_mount/data"
+    dataset_dir = "/home/aigeorge/research/ViTAL/data/camera_cage_new_mount/data"
     num_episodes = 100
 
     # name of the cameras in the dataset

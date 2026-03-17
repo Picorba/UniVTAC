@@ -260,19 +260,19 @@ if __name__ == "__main__":
     image_size = [400, 480]
     masks = make_masks(image_size, MASK_VERTICIES)
 
-    source_folders = ['/home/aigeorge/research/TactileACT/data/original/camara_cage_2_new_mount/',
-                    '/home/aigeorge/research/TactileACT/data/original/camara_cage_3/',
-                    '/home/aigeorge/research/TactileACT/data/original/camara_cage_5_crack_gel/',
-                    '/home/aigeorge/research/TactileACT/data/original/camara_cage_6_new_gel/']
+    source_folders = ['/home/aigeorge/research/ViTAL/data/original/camara_cage_2_new_mount/',
+                    '/home/aigeorge/research/ViTAL/data/original/camara_cage_3/',
+                    '/home/aigeorge/research/ViTAL/data/original/camara_cage_5_crack_gel/',
+                    '/home/aigeorge/research/ViTAL/data/original/camara_cage_6_new_gel/']
     
-    save_folder = '/home/aigeorge/research/TactileACT/data/camera_cage_new_mount/data'
+    save_folder = '/home/aigeorge/research/ViTAL/data/camera_cage_new_mount/data'
 
     # process_folder(source_folders, save_folder, image_size, masks)
 
     save_norm_stats(save_folder)
 
-    # source_file = '/home/aigeorge/research/TactileACT/data/original/camara_cage_1/run_0/episode_3'
-    # save_file = '/home/aigeorge/research/TactileACT/test.hdf5'
+    # source_file = '/home/aigeorge/research/ViTAL/data/original/camara_cage_1/run_0/episode_3'
+    # save_file = '/home/aigeorge/research/ViTAL/test.hdf5'
     # uncompress_data(source_file, save_file, image_size, masks, use_rot=False)
 
 

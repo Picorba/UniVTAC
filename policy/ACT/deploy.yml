@@ -1,6 +1,11 @@
 # Basic experiment configuration
 policy_name: ACT
 seed: 0
-ckpt_setting: 50
+ckpt_setting: 100
 instruction_type: seen
 instuction_file: null
+task_name: lift_bottle  # Your task name
+ckpt_setting: demo-50   # Must match training: {task_config}-{expert_data_num}
+state_dim: 8            # TacArena single arm (7 DOF + 1 gripper)
+chunk_size: 50          # Must match training
+temporal_agg: True     # Must match training

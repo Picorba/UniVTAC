@@ -21,6 +21,11 @@ class Task(BaseTask):
             pose=wall_pose,
             density=1e5
         )
+        """self.oscar = self._actor_manager.add_rigid_from_usd_file(
+            name='oscar',
+            asset_path="oscar.usd",
+            pose=oscar_pose
+        )"""
         self.oscar = self._actor_manager.add_from_usd_file(
             name='oscar',
             asset_path="oscar.usd",
@@ -28,21 +33,28 @@ class Task(BaseTask):
             density=2e5
         )
     def _reset_actors(self):
-        oscar_offset = self.create_noise([0.01, 0.05, 0.0], [0, 0, np.pi/18])
-        oscar_pose = self.wall.get_pose().add_bias([-0.18, 0.0, 0.03]).add_rotation([0, np.pi/2, np.pi/2]).add_offset(oscar_offset)
+        self.yaw_offset = np.random.uniform(-np.pi/4, np.pi/4)
+        oscar_offset = self.create_noise([0.01, 0.05, 0.0], [0, 0, 0])
+        oscar_pose = (self.wall.get_pose()
+                      .add_bias([-0.18, 0.0, 0.03])
+                      .add_rotation([0, np.pi/2, np.pi/2])
+                      .add_offset(oscar_offset)
+                      .add_rotation([0, 0, self.yaw_offset]))
         self.oscar.set_pose(oscar_pose)
 
     def pre_move(self):
         self.delay(10)
 
         oscar_pose = self.oscar.get_pose()
-        target_pose = oscar_pose.add_bias([-0.05, 0, -0.011], coord='world')  # Shift in x so it grabs the head
+        # Shift toward the head along the yaw-rotated X axis
+        head_dir = np.array([-0.05 * np.cos(self.yaw_offset), -0.05 * np.sin(self.yaw_offset), -0.011])
+        target_pose = oscar_pose.add_bias(head_dir, coord='world')
 
         self.grasp_noise = self.create_noise(euler=[0, [-np.pi/12, 0.0], 0])
         target_pose = construct_grasp_pose(
             target_pose.p,
             np.array([0, 0, 1]),
-            np.array([1, 0, 0])
+            np.array([np.cos(self.yaw_offset), np.sin(self.yaw_offset), 0])
         ).add_offset(self.grasp_noise)
         grasp_idx = self.oscar.register_point(
             pose=target_pose,
@@ -60,7 +72,6 @@ class Task(BaseTask):
         self.move(self.atom.close_gripper())
         self.move(self.atom.move_by_displacement(z=0.1))
         if not self.check_mid_success():
-            # Oscar didn't follow the gripper — try an additional boost
             self.move(self.atom.move_by_displacement(z=0.05))
         self.move(self.atom.open_gripper(0.5))
         self.delay(30, is_save=False)

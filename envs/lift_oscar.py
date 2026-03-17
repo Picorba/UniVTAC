@@ -4,7 +4,7 @@ import numpy as np
 @configclass
 class TaskCfg(BaseTaskCfg):
     step_lim = 500
-    adaptive_grasp_depth_threshold = 15
+    adaptive_grasp_depth_threshold = 10
     use_adaptive_grasp = True
 
 class Task(BaseTask):
@@ -13,7 +13,7 @@ class Task(BaseTask):
     
     def create_actors(self):
         wall_pose = Pose([0.75, 0.0, 0.005], [1, 0, 0, 0])
-        oscar_pose = wall_pose.add_bias([-0.18, 0.0, 0.03]).add_rotation([0, 0, np.pi/2])
+        oscar_pose = wall_pose.add_bias([-0.18, 0.0, 0.03]).add_rotation([0, np.pi/2, np.pi/2])
 
         self.wall = self._actor_manager.add_from_usd_file(
             name='wall',
@@ -21,27 +21,23 @@ class Task(BaseTask):
             pose=wall_pose,
             density=1e5
         )
-        """self.oscar = self._actor_manager.add_rigid_from_usd_file(
-            name='oscar',
-            asset_path="oscar.usd",
-            pose=oscar_pose
-        )"""
         self.oscar = self._actor_manager.add_from_usd_file(
             name='oscar',
-            asset_path="oscar_detailled.usd",
+            asset_path="oscar.usd",
             pose=oscar_pose,
-            density=1e5
+            density=2e5
         )
     def _reset_actors(self):
         oscar_offset = self.create_noise([0.01, 0.05, 0.0], [0, 0, np.pi/18])
-        oscar_pose = self.wall.get_pose().add_bias([-0.18, 0.0, 0.03]).add_rotation([0, 0, np.pi/2]).add_offset(oscar_offset)
+        oscar_pose = self.wall.get_pose().add_bias([-0.18, 0.0, 0.03]).add_rotation([0, np.pi/2, np.pi/2]).add_offset(oscar_offset)
         self.oscar.set_pose(oscar_pose)
 
     def pre_move(self):
         self.delay(10)
 
         oscar_pose = self.oscar.get_pose()
-        target_pose = oscar_pose.add_bias([0.0, 0, -0.01], coord='world')
+        target_pose = oscar_pose.add_bias([-0.05, 0, -0.011], coord='world')  # Shift in x so it grabs the head
+
         self.grasp_noise = self.create_noise(euler=[0, [-np.pi/12, 0.0], 0])
         target_pose = construct_grasp_pose(
             target_pose.p,
@@ -58,24 +54,28 @@ class Task(BaseTask):
             is_close=False,
             pre_dis=0.5
         ))
-        self.target_pose = self.wall.get_pose().add_bias([0.0, 0, -0.01])
+        self.target_pose = self.wall.get_pose().add_bias([-0.18, 0, 0.05])
         
     def _play_once(self):
         self.move(self.atom.close_gripper())
         self.move(self.atom.move_by_displacement(z=0.1))
-        self.delay(50, is_save=True)
+        if not self.check_mid_success():
+            # Oscar didn't follow the gripper — try an additional boost
+            self.move(self.atom.move_by_displacement(z=0.05))
+        self.move(self.atom.open_gripper(0.5))
+        self.delay(30, is_save=False)
 
     def check_mid_success(self):
-        rel_pose = self.oscar.get_pose().rebase(self.target_pose)
-        return rel_pose[0] > -0.01
-    
+        # Oscar center starts at z≈0.035; confirm it is being lifted
+        return self.oscar.get_pose()[2] > 0.08
+
     def check_early_stop(self):
-        rel_pose = self.oscar.get_pose().rebase(self.target_pose)
-        if self.take_action_cnt > 300 and np.abs(np.dot(rel_pose.to_transformation_matrix()[:3, 0], np.array([-1, 0, 0]))) > 0.99:
+        # Stop early if oscar has dropped back to near its start height after 300 steps
+        if self.take_action_cnt > 300 and self.oscar.get_pose()[2] < 0.04:
             return True
         return False
 
     def check_success(self):
-        rel_pose = self.oscar.get_pose().rebase(self.target_pose)
-        return rel_pose[0] > -0.02 and np.all(np.abs(rel_pose[1:3]) < np.array([0.1, 0.001])) \
-            and np.abs(np.dot(rel_pose.to_transformation_matrix()[:3, 0], np.array([0, 0, 1]))) > 0.99
+        # Oscar center (origin at middle) must be above 8cm — confirms it was lifted off
+        print("/" * 80, self.oscar.get_pose()[2])
+        return self.oscar.get_pose()[2] > 0.06

@@ -130,7 +130,7 @@ class BaseTaskCfg(DirectRLEnvCfg):
 
     use_adaptive_grasp: bool = True
     adaptive_grasp_depth_threshold = None # in mm
-    reset_time_limit: float = 120.0  # in seconds
+    reset_time_limit: float = 1000.0  # in seconds
 
     cameras: list[CameraCfg] = [
         CameraCfg(

@@ -60,3 +60,4 @@ ${data}/
 *.obj
 *.mtl
 *.pth
+*.usd

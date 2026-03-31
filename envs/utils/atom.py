@@ -304,13 +304,23 @@ class Atom:
     ):
         return [Action("move", target_pose=target_pose)]
     
-    def close_gripper(self, pos: float = 0.0, depth_threshold:Literal['auto']|float='auto'):
+    def close_gripper(self, pos: float = 0.0, depth_threshold:Literal['auto']|float='auto',
+                      force: float = None):
+        """Close the gripper.
+
+        Args:
+            pos: Target opening in [0, 1] (only used in position / adaptive mode).
+            depth_threshold: Tactile depth threshold for adaptive grasp ('auto' uses cfg value).
+            force: Gripping force in Newtons for force-control mode.  If None, falls back to
+                   ``cfg.grasp_force``.  Has no effect when ``use_force_grasp`` is False.
+        """
         if depth_threshold == 'auto':
             if self.task.cfg.use_adaptive_grasp:
                 depth_threshold = self.task.cfg.adaptive_grasp_depth_threshold
             else:
                 depth_threshold = None
-        return [Action("close", target_gripper_pos=pos, gripper_depth_threshold=depth_threshold)]
+        return [Action("close", target_gripper_pos=pos,
+                       gripper_depth_threshold=depth_threshold, gripper_force=force)]
 
     def open_gripper(self, pos: float = 1.0, depth_threshold: float = None):
         return [Action("open", target_gripper_pos=pos, gripper_depth_threshold=depth_threshold)]

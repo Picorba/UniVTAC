@@ -10,7 +10,9 @@ OSCAR_BASE_POSE = Pose([0.55, 0.0, 0.03], [1, 0, 0, 0])
 class TaskCfg(BaseTaskCfg):
     step_lim = 500
     adaptive_grasp_depth_threshold = 7.5
-    use_adaptive_grasp = True
+    use_adaptive_grasp = False
+    use_force_grasp: bool = True
+    grasp_force: float = float(os.environ.get('LIFT_OSCAR_GRASP_FORCE', 40.0))  # Newtons
     DENSITY: int = int(os.environ.get('LIFT_OSCAR_DENSITY', 500))
 
 

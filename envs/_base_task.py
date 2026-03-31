@@ -130,6 +130,8 @@ class BaseTaskCfg(DirectRLEnvCfg):
 
     use_adaptive_grasp: bool = True
     adaptive_grasp_depth_threshold = None # in mm
+    use_force_grasp: bool = False
+    grasp_force: float = 10.0  # in Newtons; used when use_force_grasp=True
     reset_time_limit: float = 1000.0  # in seconds
 
     cameras: list[CameraCfg] = [
@@ -701,7 +703,14 @@ class BaseTask(UipcRLEnv):
 
             if action.action == 'gripper' or action.action == 'all':
                 if self.mode in ['collect', 'eval_test'] or (self.mode == 'eval' and self.in_pre_move):
-                    if self.cfg.use_adaptive_grasp:
+                    if self.cfg.use_force_grasp:
+                        per_call_force = action.args.get('gripper_force')
+                        control_seq['gripper'] = {
+                            'status': 'success',
+                            'num_steps': -2,
+                            'target_force': per_call_force if per_call_force is not None else self.cfg.grasp_force,
+                        }
+                    elif self.cfg.use_adaptive_grasp:
                         target_pos = self._robot_manager.gripper_percent2qpos(action.target_gripper_pos)
                         control_seq['gripper'] = {
                             'status': 'success',
@@ -769,6 +778,22 @@ class BaseTask(UipcRLEnv):
                     self._robot_manager.set_gripper(pos, vel)
                 self._step(is_save)
                 idx += 1
+        elif gripper_steps == -2:  # force control
+            idx, gripper_active = 0, True
+            gripper_planner = self.force_control_gripper(gripper_seq['target_force'])
+            while True:
+                if idx >= arm_steps and not gripper_active:
+                    break
+                if arm_seq is not None and idx < arm_steps:
+                    self._robot_manager.set_arm(
+                        arm_seq['position'][idx],
+                        arm_seq['velocity'][idx]
+                    )
+                if gripper_active:
+                    target_force, gripper_active = next(gripper_planner)
+                    self._robot_manager.set_gripper_effort(target_force)
+                self._step(is_save)
+                idx += 1
         else:
             max_control_len = max(arm_steps, gripper_steps)
             for idx in range(max_control_len):
@@ -788,11 +813,17 @@ class BaseTask(UipcRLEnv):
     def check_early_stop(self):
         return False
 
-    def take_action(self, action:torch.Tensor, action_type:Literal['qpos', 'ee', 'delta_ee']='qpos', force:bool=True):
+    def take_action(self, action:torch.Tensor, action_type:Literal['qpos', 'ee', 'delta_ee']='qpos',
+                    gripper_mode:Literal['position', 'force']='position', force:bool=True):
         '''
-            qpos     : actions is Tensor([8]), qpos (7 DOFS + gripper)
-            ee       : actions is Tensor([7]), position (3), orientation (4)
-            delta_ee : actions is Tensor([6]), delta_position (3), delta_orientation (3)
+            qpos     : action is Tensor([8]), qpos (7 DOFS + gripper)
+            ee       : action is Tensor([8]), position (3), orientation (4), gripper (1)
+            delta_ee : action is Tensor([7]), delta_position (3), delta_orientation (3), delta_gripper (1)
+
+            gripper_mode='position' (default): action[-1] is gripper opening in metres (0 = closed, gripper_max_qpos = open).
+            gripper_mode='force'             : action[-1] is the gripping force in Newtons (positive = closing).
+                                               The PD position drive is suppressed; a pure effort target is applied.
+                                               Only supported with action_type='qpos'.
         '''
         if self.take_action_cnt >= self.cfg.step_lim or self.eval_success:
             return True, self.eval_success
@@ -816,15 +847,32 @@ class BaseTask(UipcRLEnv):
             exec_success = self.move([
                 Action(action='all', target_pose=ee_next_pose, target_gripper_pos=gripper_next_pos)
             ], delay=False)
-        else:
+        else:  # qpos
             self._robot_manager.set_arm(action[:-1], force=force)
-            self._robot_manager.set_gripper(action[-1], force=force)
+            if gripper_mode == 'force':
+                self._robot_manager.set_gripper_effort(action[-1])
+            else:
+                self._robot_manager.set_gripper(action[-1], force=force)
             self._step()
         
         if self.check_success():
             self.eval_success = True
 
         return exec_success, self.eval_success
+
+    def force_control_gripper(self, target_force: float, max_steps: int = 1000):
+        """Generator that applies a constant gripping force for up to *max_steps* steps.
+
+        Yields ``(target_force, active)`` each step; when the generator exhausts
+        *max_steps* it yields one final ``active=False`` to signal completion.
+
+        Args:
+            target_force: Gripping force in Newtons (positive = closing).
+            max_steps: Maximum number of simulation steps to hold the force.
+        """
+        for _ in range(max_steps):
+            yield target_force, True
+        yield target_force, False
 
     def adaptive_set_gripper(self, qpos, depth_threshold:float=None):
         max_steps = 1000

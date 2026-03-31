@@ -149,6 +149,41 @@ class RobotManager:
                 self.robot._ALL_INDICES
             )
 
+    def set_gripper_effort(self, effort: float | torch.Tensor, env_ids=None):
+        """Apply a gripping force in force-control mode.
+
+        Cancels the PD position error by tracking the current joint position,
+        then overlays the requested effort via set_joint_effort_target.
+
+        Args:
+            effort: Gripping force in Newtons (positive = closing force).
+                    Scalar, 0-d tensor, or 1-element tensor.
+            env_ids: Optional environment indices.
+        """
+        # Track current position so the PD controller contributes zero net force.
+        current_pos = self.robot.data.joint_pos[:, self._gripper_ids]
+        self.robot.set_joint_position_target(current_pos, joint_ids=self._gripper_ids, env_ids=env_ids)
+        self.robot.set_joint_velocity_target(
+            torch.zeros_like(current_pos), joint_ids=self._gripper_ids, env_ids=env_ids
+        )
+
+        # Closing = decreasing joint position → negative effort on both fingers.
+        if isinstance(effort, (int, float)):
+            effort_t = torch.tensor([-effort, -effort], dtype=torch.float32, device=self.device)
+        else:
+            effort = effort.to(self.device)
+            val = -effort.item() if effort.numel() == 1 else None
+            effort_t = (
+                torch.tensor([val, val], dtype=torch.float32, device=self.device)
+                if val is not None
+                else -effort
+            )
+        self.robot.set_joint_effort_target(effort_t, joint_ids=self._gripper_ids, env_ids=env_ids)
+
+    def get_gripper_effort(self) -> torch.Tensor:
+        """Return the current applied torques on the gripper joints (N for prismatic joints)."""
+        return self.robot.data.applied_torque[0, self._gripper_ids]
+
     def plan_arm(self, target_pose:Pose, constraint_pose=None, pre_dis=None, time_dilation_factor=None):
         result:MotionGenResult = self.planner.plan_path(
             curr_joint_pos=self.robot.data.joint_pos[0, :self.robot.num_joints-2],

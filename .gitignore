@@ -61,3 +61,16 @@ ${data}/
 *.mtl
 *.pth
 *.usd
+
+# Runtime dumps
+failure_analysis/
+
+# Binary assets (use LFS instead)
+*.usd
+*.exr
+*.npz
+*.npy
+*.png
+
+# Notebooks (or strip outputs before committing)
+*.ipynb

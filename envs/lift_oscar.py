@@ -18,6 +18,20 @@ class Task(BaseTask):
     def create_actors(self):
         oscar_pose = OSCAR_BASE_POSE.add_rotation([0, np.pi/2, np.pi/2])
         print("////////// DENSITY //////////", self.cfg.DENSITY)
+        wall_pose = Pose([0.75, 0.0, 0.005], [1, 0, 0, 0])
+        oscar_pose = wall_pose.add_bias([-0.18, 0.0, 0.03]).add_rotation([0, np.pi/2, np.pi/2])
+
+        self.wall = self._actor_manager.add_from_usd_file(
+            name='wall',
+            asset_path="Wall.usd",
+            pose=wall_pose,
+            density=1e5
+        )
+        """self.oscar = self._actor_manager.add_rigid_from_usd_file(
+            name='oscar',
+            asset_path="oscar.usd",
+            pose=oscar_pose
+        )"""
         self.oscar = self._actor_manager.add_from_usd_file(
             name='oscar', asset_path="oscar.usd", pose=oscar_pose, density=self.cfg.DENSITY
         )
@@ -60,13 +74,7 @@ class Task(BaseTask):
         self.move(self.atom.close_gripper(0.0, depth_threshold=7))
         
     def _play_once(self):
-        # Initial adaptive close, then tighten fully
-        self.delay(30, is_save=True)
-        self.move(self.atom.open_gripper())
-        self.delay(30, is_save=True)
-        self.move(self.atom.close_gripper())
-
-        """self.move(self.atom.close_gripper(0.0, depth_threshold=7))
+        self.move(self.atom.close_gripper(0.0, depth_threshold=7))
         self.origin_inhand_pose = self.oscar.get_pose().rebase(self.atom.get_arm_pose())
         # Move directly to above the pad — cuRobo plans a collision-free arc,
         # the lifting happens naturally as part of this motion
@@ -80,8 +88,7 @@ class Task(BaseTask):
         self.move(self.atom.move_by_displacement(z=-0.05), time_dilation_factor=0.5)
         self.move(self.atom.move_by_displacement(z=-0.05), time_dilation_factor=0.5)
         # Relax grip and lower straight onto the pad
-        self.move(self.atom.open_gripper())"""
-        self.delay(30, is_save=False)
+        self.move(self.atom.open_gripper())
 
     """def check_early_stop(self):
         ee_pos = self.atom.get_arm_pose().p

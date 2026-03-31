@@ -69,10 +69,7 @@ sapien==3.0.1
 scikit_learn==1.7.2
 scipy==1.16.2
 setuptools==78.1.1
-setuptools==70.0.0
-setuptools==71.1.0
 setuptools_scm==9.2.0
-setuptools_scm==8.0.4
 sphinx_book_theme==1.1.4
 stable_baselines3==2.7.0
 sympy==1.13.3

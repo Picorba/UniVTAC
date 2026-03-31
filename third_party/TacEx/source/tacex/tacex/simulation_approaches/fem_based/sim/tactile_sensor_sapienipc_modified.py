@@ -325,7 +325,7 @@ class VisionTactileSensorUIPC:
         ).sum(1)
 
         mean_motion = np.mean(
-            self.get_vertices_camera()[self.constrain_ids].cpu().numpy() - self.constrain_pts, axis=0)
+             self.get_vertices_camera()[self.constrain_ids].cpu().numpy() - self.constrain_pts, axis=0)
         curr_marker_pts[:, :2] -= mean_motion[:2]
 
         init_marker_uv = self.gen_marker_uv(init_marker_pts)

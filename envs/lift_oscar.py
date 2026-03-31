@@ -1,81 +1,104 @@
 from ._base_task import *
+import os
 import numpy as np
+
+
+OSCAR_BASE_POSE = Pose([0.55, 0.0, 0.03], [1, 0, 0, 0])
+
 
 @configclass
 class TaskCfg(BaseTaskCfg):
     step_lim = 500
-    adaptive_grasp_depth_threshold = 10
+    adaptive_grasp_depth_threshold = 7.5
     use_adaptive_grasp = True
+    DENSITY: int = int(os.environ.get('LIFT_OSCAR_DENSITY', 500))
+
 
 class Task(BaseTask):
-    def __init__(self, cfg: BaseTaskCfg, mode:Literal['collect', 'eval'] = 'collect', render_mode: str|None = None, **kwargs):
-        super().__init__(cfg, mode, render_mode, **kwargs)
-    
     def create_actors(self):
-        wall_pose = Pose([0.75, 0.0, 0.005], [1, 0, 0, 0])
-        oscar_pose = wall_pose.add_bias([-0.18, 0.0, 0.03]).add_rotation([0, np.pi/2, np.pi/2])
-
-        self.wall = self._actor_manager.add_from_usd_file(
-            name='wall',
-            asset_path="Wall.usd",
-            pose=wall_pose,
-            density=1e5
-        )
+        oscar_pose = OSCAR_BASE_POSE.add_rotation([0, np.pi/2, np.pi/2])
+        print("////////// DENSITY //////////", self.cfg.DENSITY)
         self.oscar = self._actor_manager.add_from_usd_file(
-            name='oscar',
-            asset_path="oscar.usd",
-            pose=oscar_pose,
-            density=2e5
+            name='oscar', asset_path="oscar.usd", pose=oscar_pose, density=self.cfg.DENSITY
         )
+        stand_pose = Pose([0.4, -0.08, 0.01], [1, 0, 0, 0])
+        self.stand = self._actor_manager.add_from_usd_file(
+            name='stand', asset_path="OrangePad.usd", pose=stand_pose,
+        )
+
     def _reset_actors(self):
         oscar_offset = self.create_noise([0.01, 0.05, 0.0], [0, 0, np.pi/18])
-        oscar_pose = self.wall.get_pose().add_bias([-0.18, 0.0, 0.03]).add_rotation([0, np.pi/2, np.pi/2]).add_offset(oscar_offset)
+        oscar_pose = OSCAR_BASE_POSE.add_rotation([np.pi/2, 0, 0]).add_offset(oscar_offset)
         self.oscar.set_pose(oscar_pose)
+        self._success_steps = 0
+        self._oscar_initial_pos = oscar_pose.p.copy()
+        self.domain_rand_params = {
+            'oscar_dx': float(oscar_offset.p[0]),
+            'oscar_dy': float(oscar_offset.p[1]),
+            'oscar_drz': float(oscar_offset.euler[2]),
+            'density': self.cfg.DENSITY,
+        }
 
     def pre_move(self):
         self.delay(10)
-
         oscar_pose = self.oscar.get_pose()
-        target_pose = oscar_pose.add_bias([-0.05, 0, -0.011], coord='world')  # Shift in x so it grabs the head
-
-        self.grasp_noise = self.create_noise(euler=[0, [-np.pi/12, 0.0], 0])
-        target_pose = construct_grasp_pose(
+        # Top-down grasp at the oscar's center.
+        # grasp_from=[0,0,1] → gripper approaches straight down, pre-position above the statue.
+        # camera_up=[0,1,0] → fingers spread in world-y, gripping the widest axis of the body.
+        target_pose = oscar_pose.add_bias([0, 0, 0.04], coord='world')
+        grasp_pose = construct_grasp_pose(
             target_pose.p,
-            np.array([0, 0, 1]),
-            np.array([1, 0, 0])
-        ).add_offset(self.grasp_noise)
-        grasp_idx = self.oscar.register_point(
-            pose=target_pose,
-            type='contact'
+            np.array([0, 0, 1]),   # top-down approach (no table collision)
+            np.array([1, 0, 0])    # camera_up rotated 90° around z vs [0,1,0]
         )
+        grasp_idx = self.oscar.register_point(pose=grasp_pose, type='contact')
         self.move(self.atom.grasp_actor(
             self.oscar,
             contact_point_id=grasp_idx,
             is_close=False,
-            pre_dis=0.5
         ))
-        self.target_pose = self.wall.get_pose().add_bias([-0.18, 0, 0.05])
+        self.move(self.atom.close_gripper(0.0, depth_threshold=7))
         
     def _play_once(self):
+        # Initial adaptive close, then tighten fully
+        self.delay(30, is_save=True)
+        self.move(self.atom.open_gripper())
+        self.delay(30, is_save=True)
         self.move(self.atom.close_gripper())
-        self.move(self.atom.move_by_displacement(z=0.1))
-        if not self.check_mid_success():
-            # Oscar didn't follow the gripper — try an additional boost
-            self.move(self.atom.move_by_displacement(z=0.05))
-        self.move(self.atom.open_gripper(0.5))
+
+        """self.move(self.atom.close_gripper(0.0, depth_threshold=7))
+        self.origin_inhand_pose = self.oscar.get_pose().rebase(self.atom.get_arm_pose())
+        # Move directly to above the pad — cuRobo plans a collision-free arc,
+        # the lifting happens naturally as part of this motion
+        pad_pose = self.stand.get_pose()
+        ee_now = self.atom.get_arm_pose()
+        above_pad = Pose([pad_pose.p[0], pad_pose.p[1], ee_now.p[2] + 0.1], ee_now.q)
+        self.move(self.atom.move_to_pose(above_pad),time_dilation_factor=0.5)
+        self.move(self.atom.close_gripper(0.0, depth_threshold=7))
+        self.delay(30, is_save=True)
+        self.move(self.atom.close_gripper(0.0, depth_threshold=30))
+        self.move(self.atom.move_by_displacement(z=-0.05), time_dilation_factor=0.5)
+        self.move(self.atom.move_by_displacement(z=-0.05), time_dilation_factor=0.5)
+        # Relax grip and lower straight onto the pad
+        self.move(self.atom.open_gripper())"""
         self.delay(30, is_save=False)
 
-    def check_mid_success(self):
-        # Oscar center starts at z≈0.035; confirm it is being lifted
-        return self.oscar.get_pose()[2] > 0.08
+    """def check_early_stop(self):
+        ee_pos = self.atom.get_arm_pose().p
+        oscar_pos = self.oscar.get_pose().p
 
-    def check_early_stop(self):
-        # Stop early if oscar has dropped back to near its start height after 300 steps
-        if self.take_action_cnt > 300 and self.oscar.get_pose()[2] < 0.04:
+        not_in_original = np.linalg.norm(oscar_pos - self._oscar_initial_pos) > 0.05
+        far_from_arm = np.linalg.norm(oscar_pos - ee_pos) > 0.05
+
+        if not_in_original and far_from_arm:
             return True
-        return False
+        return False"""
 
     def check_success(self):
-        # Oscar center (origin at middle) must be above 8cm — confirms it was lifted off
-        print("/" * 80, self.oscar.get_pose()[2])
-        return self.oscar.get_pose()[2] > 0.06
+        pad_pose = self.stand.get_pose()
+        oscar_pos = self.oscar.get_pose().p
+        in_zone = ( pad_pose.p[2] + 0.08 > oscar_pos[2] > pad_pose.p[2] + 0.03
+                   and np.all(np.abs(oscar_pos[:2] - pad_pose.p[:2]) < 0.05))
+        print("/" *80, oscar_pos[2] -  pad_pose.p[2])
+        self._success_steps = (self._success_steps + 1) if in_zone else 0
+        return in_zone

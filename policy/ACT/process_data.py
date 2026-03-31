@@ -45,13 +45,36 @@ def load_hdf5(dataset_paths, camera_type, downsample_factor):
 
 
 def data_transform(path, episode_num, save_path):
+    global task_name
+    with open('../task_settings.json', 'r') as f:
+        task_settings = json.load(f)
+    assert task_name in task_settings, f"Task '{task_name}' not found in task_settings.json"
+    camera_type = task_settings[task_name].get('camera_type', 'head')
+    downsample_factor = task_settings[task_name].get('downsample', 1)
+
     hdf5_dir = Path(path) / 'hdf5'
     if not hdf5_dir.exists():
         hdf5_dir = Path(path)
         if len(list(hdf5_dir.glob('*.hdf5'))) == 0:
-            print(f"HDF5 directory does not exist at \n{hdf5_dir}\n")
-            raise FileNotFoundError(f"HDF5 directory not found: {hdf5_dir}")
-    
+            # Look for hdf5 files in subdirectories (e.g. density_500/hdf5/)
+            sub_hdf5_files = sorted(
+                [f for sub in sorted(Path(path).iterdir()) if sub.is_dir()
+                 for f in (sub / 'hdf5').glob('*.hdf5') if (sub / 'hdf5').exists()],
+                key=lambda x: int(x.stem)
+            )
+            if not sub_hdf5_files:
+                print(f"HDF5 directory does not exist at \n{hdf5_dir}\n")
+                raise FileNotFoundError(f"HDF5 directory not found: {hdf5_dir}")
+            assert episode_num <= len(sub_hdf5_files), \
+                f"data num not enough: requested {episode_num}, found {len(sub_hdf5_files)}"
+            if not os.path.exists(save_path):
+                os.makedirs(save_path)
+            print(f"Loading {episode_num} episodes from subdirectories with camera type '{camera_type}', downsample factor {downsample_factor}.")
+            dataset_paths = [str(sub_hdf5_files[i]) for i in range(episode_num)]
+            print(dataset_paths[:episode_num])
+            data = load_hdf5(dataset_paths, camera_type, downsample_factor)
+            return _write_episodes(data, episode_num, save_path, camera_type)
+
     # 获取所有 episode 文件
     hdf5_files = sorted(hdf5_dir.glob('*.hdf5'), key=lambda x: int(x.stem))
     assert episode_num <= len(hdf5_files), f"data num not enough: requested {episode_num}, found {len(hdf5_files)}"
@@ -59,18 +82,16 @@ def data_transform(path, episode_num, save_path):
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
-    global task_name
-    with open('../task_settings.json', 'r') as f:
-        task_settings = json.load(f)
-    assert task_name in task_settings, f"Task '{task_name}' not found in task_settings.json"
-    camera_type = task_settings[task_name].get('camera_type', 'head')
-    downsample_factor = task_settings[task_name].get('downsample', 1)
     print(f"Loading {episode_num} episodes with camera type '{camera_type}', downsample factor {downsample_factor}.")
 
     # 批量加载所有 episode
     dataset_paths = [str(hdf5_files[i]) for i in range(episode_num)]
+    print(dataset_paths[:episode_num])
     data = load_hdf5(dataset_paths[:episode_num], camera_type, downsample_factor)
-    
+    return _write_episodes(data, episode_num, save_path, camera_type)
+
+
+def _write_episodes(data, episode_num, save_path, camera_type):
     # 提取批量数据
     joint_state_all = data['embodiment/joint_state'][:, 0:8]
     joint_action_all = data['embodiment/joint_action'][:, 0:8]
@@ -83,11 +104,11 @@ def data_transform(path, episode_num, save_path):
     left_tac_all = data['tactile/left_gsmini/rgb_marker']  # (T_total, H, W, 3)
     right_tac_all = data['tactile/right_gsmini/rgb_marker']  # (T_total, H, W, 3)
     episode_ends = data['episode_ends']
-    
+
     start_idx = 0
     for i in tqdm(range(episode_num), desc='Writing episodes'):
         end_idx = episode_ends[i]
-        
+
         joint_state = joint_state_all[start_idx:end_idx]
         joint_action = joint_action_all[start_idx:end_idx]
         if camera_type == 'all':

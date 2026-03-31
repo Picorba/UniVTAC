@@ -3,7 +3,7 @@ import numpy as np
 
 @configclass
 class TaskCfg(BaseTaskCfg):
-    adaptive_grasp_depth_threshold = 27.5
+    adaptive_grasp_depth_threshold = 30
 
 class Task(BaseTask):
     def __init__(self, cfg: BaseTaskCfg, mode:Literal['collect', 'eval'] = 'collect', render_mode: str|None = None, **kwargs):
@@ -35,13 +35,20 @@ class Task(BaseTask):
 
         self.shelf.set_pose(base_pose)
         self.bottle.set_pose(bottle_pose)
+        self.domain_rand_params = {
+            'shelf_dx':  float(base_offset.p[0]),    # m, uniform(-0.05, 0.05)
+            'bottle_dy': float(bottle_offset.p[1]),  # m, uniform(-0.03, 0.03)
+        }
  
     def pre_move(self):
         self.delay(10)
 
         bottle_pose = self.bottle.get_pose()
-        target_pose = bottle_pose.add_bias([0, 0, 0.11+0.01*self.rng.random()])
+        grasp_z_height = 0.11 + 0.01 * self.rng.random()
+        target_pose = bottle_pose.add_bias([0, 0, grasp_z_height])
         self.grasp_noise = self.create_noise(euler=[0, np.pi/18, 0])
+        self.domain_rand_params['grasp_z_height'] = float(grasp_z_height)  # m, uniform(0.11, 0.12)
+        self.domain_rand_params['grasp_pitch'] = float(self.grasp_noise.euler[1])  # rad, uniform(-pi/18, pi/18)
         target_pose = construct_grasp_pose(
             target_pose.p,
             [0, 0, 1],

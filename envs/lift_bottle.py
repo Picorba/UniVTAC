@@ -30,6 +30,12 @@ class Task(BaseTask):
         bottle_offset = self.create_noise([0.01, 0.05, 0.0], [0, 0, np.pi/18])
         bottle_pose = self.wall.get_pose().add_bias([-0.08, 0.0, 0.03]).add_offset(bottle_offset)
         self.bottle.set_pose(bottle_pose)
+        self.domain_rand_params = {
+            'bottle_dx': float(bottle_offset.p[0]),   # m, uniform(-0.01, 0.01)
+            'bottle_dy': float(bottle_offset.p[1]),   # m, uniform(-0.05, 0.05)
+            'bottle_drz': float(bottle_offset.euler[2]),  # rad, uniform(-pi/18, pi/18)
+        }
+        print("self.domain_rand_params", self.domain_rand_params)
 
     def pre_move(self):
         self.delay(10)
@@ -38,6 +44,8 @@ class Task(BaseTask):
         target_pose = bottle_pose.add_bias([-0.13, 0, -0.015])
         target_mat = target_pose.to_transformation_matrix()
         self.grasp_noise = self.create_noise(euler=[0, [-np.pi/12, 0.0], 0])
+        self.domain_rand_params['grasp_pitch'] = float(self.grasp_noise.euler[1])  # rad, uniform(-pi/12, 0)
+        print("self.domain_rand_params", self.domain_rand_params)
         target_pose = construct_grasp_pose(
             target_pose.p,
             target_mat[:3, 2],

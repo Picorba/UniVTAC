@@ -18,7 +18,7 @@ class Policy(BasePolicy):
         """Initialize ACT policy for TacArena deployment"""
         # Construct checkpoint directory path
         self.train_config_name = os.environ.get('TRAIN_CONFIG', 'train_config')
-        self.ep_num = os.environ.get('EP_NUM', '100')
+        self.ep_num = os.environ.get('EP_NUM', '50')
         ckpt_dir = Path(__file__).parent / "act_ckpt" / f"act-{args['task_name']}" / f"{args['task_config']}-{self.ep_num}" / self.train_config_name
  
         self.task_name = args['task_name']

@@ -3,7 +3,10 @@ import numpy as np
 
 @configclass
 class TaskCfg(BaseTaskCfg):
-    pass
+    # Reduced from default (27.5mm) to prevent over-compression of gel during grasp,
+    # which caused markers to crowd/merge and appear as elongated blobs in tactile images.
+    # OLD: not set (fell back to robot default of 27.5mm)
+    adaptive_grasp_depth_threshold = 25.0  # in mm
 
 class Task(BaseTask):
     def __init__(self, cfg: TaskCfg, mode:Literal['collect', 'eval'] = 'collect', render_mode: str|None = None, **kwargs):
@@ -41,6 +44,12 @@ class Task(BaseTask):
 
         self.slot.set_pose(base_pose)
         self.key.set_pose(key_pose)
+        self.domain_rand_params = {
+            'slot_dx': float(random_pose.p[0]),
+            'slot_dy': float(random_pose.p[1]),
+            'slot_rotate': float(random_rotate),
+            'key_rotation': float(self.key_rotation),
+        }
 
     def pre_move(self):
         self.delay(10)

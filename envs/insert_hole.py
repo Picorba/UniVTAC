@@ -38,6 +38,11 @@ class Task(BaseTask):
         base_offset = self.create_noise([0.02, 0.03, 0.0]).add_rotation([0, 0, self.rotate])
         base_pose = Pose([0.6, 0.0, 0.002], [1, 0, 0, 0]).add_offset(base_offset)
         self.slot.set_pose(base_pose)
+        self.domain_rand_params = {
+            'slot_dx': float(base_offset.p[0]),
+            'slot_dy': float(base_offset.p[1]),
+            'rotate': float(self.rotate),
+        }
     
     def pre_move(self):
         self.delay(10)

@@ -21,6 +21,9 @@ services:
         - ISAACLAB_BASE_IMAGE_ARG=${ISAACLAB_BASE_IMAGE}
         - ISAACLAB_EXTENSION_TEMPLATE_PATH_ARG=${ISAACLAB_EXTENSION_TEMPLATE_PATH}
         - ISAACLAB_PATH_ARG=${DOCKER_ISAACLAB_PATH}
+        - CMAKE_CUDA_ARCHITECTURES=${CMAKE_CUDA_ARCHITECTURES}
+        - TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST}
+        
     image: isaac-lab-univtac
     container_name: isaac-lab-univtac
     volumes:

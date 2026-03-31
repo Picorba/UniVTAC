@@ -117,12 +117,12 @@ def get_norm_stats(dataset_dir, num_episodes):
     # normalize action data
     action_mean = np.mean(all_action_data, axis=0)
     action_std = np.std(all_action_data, axis=0)
-    action_std = np.clip(action_std, 1e-2, np.inf)  # clipping
+    action_std = np.clip(action_std, 1e-4, np.inf)  # clipping
     
     # normalize qpos data
     qpos_mean = np.mean(all_qpos_data, axis=0)
     qpos_std = np.std(all_qpos_data, axis=0)
-    qpos_std = np.clip(qpos_std, 1e-2, np.inf)  # clipping
+    qpos_std = np.clip(qpos_std, 1e-4, np.inf)  # clipping
 
     stats = {
         "action_mean": action_mean,

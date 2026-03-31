@@ -56,6 +56,12 @@ parser.add_argument(
     "--print_only",
     action='store_true',
 )
+parser.add_argument(
+    "--density",
+    type=int,
+    default=-1,
+    help="Density override for lift_oscar (sets LIFT_OSCAR_DENSITY env var). -1 means use default.",
+)
 AppLauncher.add_app_launcher_args(parser)
 
 # parse the arguments
@@ -211,6 +217,10 @@ def main():
     else:
         instructions = {'seen': ['Empty'], 'unseen': ['Empty']}
 
+    if args_cli.density != -1:
+        import os
+        os.environ['LIFT_OSCAR_DENSITY'] = str(args_cli.density)
+
     task_module = importlib.import_module(f"envs.{task_file_name}")
 
     policy_module = importlib.import_module(f"policy.{policy_name}")
@@ -218,7 +228,10 @@ def main():
     curr_time = time.strftime(r'%Y-%m-%d_%H:%M:%S')
 
     env_cfg:BaseTaskCfg = task_module.TaskCfg()
-    env_cfg.save_dir = Path('eval_result') / policy_name / task_file_name / deploy_config_file.stem / curr_time
+    save_dir = Path('eval_result') / policy_name / task_file_name / deploy_config_file.stem
+    if args_cli.density != -1:
+        save_dir = save_dir / f'density_{args_cli.density}'
+    env_cfg.save_dir = save_dir / curr_time
     env_cfg.decimation = task_config.get("decimation", env_cfg.decimation)
     env_cfg.obs_data_type = task_config.get("observations", {})
     env_cfg.save_frequency = task_config.get("save_frequency", env_cfg.save_frequency)

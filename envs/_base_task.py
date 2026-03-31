@@ -209,7 +209,7 @@ class BaseTask(UipcRLEnv):
         self.atom_id = 0
         self.log = ''
         self.metadata = {}
- 
+        self.domain_rand_params = {}
         self.instruction = ""
         self.video_handler = VideoHandler()
 
@@ -614,6 +614,7 @@ class BaseTask(UipcRLEnv):
             self.metadata['cost_step'] = self.step_count
             self.metadata['cost_time'] = time.perf_counter() - self.start_time
             self.metadata['result'] = result
+            self.metadata['domain_rand_params'] = self.domain_rand_params
             self._save_metadata()
  
     def save_to_hdf5(self):
@@ -951,7 +952,7 @@ class BaseTask(UipcRLEnv):
         for i in range(max_trials):
             success = self.move(self.atom.move_by_displacement(
                 z=delta, xyz_coord='local'
-            ), tag='try_forward', is_save=is_save, delay=False, cosntraint_pose=[1, 1, 1, 1, 1, 0])
+            ), tag='try_forward', is_save=is_save, delay=False, constraint_pose=[1, 1, 1, 1, 1, 0])
             actor_pose = actor.get_pose()
             if np.linalg.norm(actor_pose.p - actor_last_pose.p) < np.abs(delta):
                 return False

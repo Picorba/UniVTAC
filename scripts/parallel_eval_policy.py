@@ -44,9 +44,11 @@ def split_devices(cuda_visible_devices: str, workers: int):
 
 def worker_run(args, deploy_config, task_config, task_file_name, policy_name,
                instructions, base_save_dir: Path, seed_q: Queue, progress, stop_event: Event,
-               log_file: Path, device_list, status_dict, result_q: Queue):
+               log_file: Path, device_list, status_dict, result_q: Queue, density: int = -1):
     # Per-process env: set CUDA_VISIBLE_DEVICES
     os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(device_list) if device_list else ''
+    if density != -1:
+        os.environ['LIFT_OSCAR_DENSITY'] = str(density)
 
     # Redirect stdout/stderr to unified log (append, line-buffered)
     log_fd = os.open(str(log_file), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
@@ -213,6 +215,8 @@ def main():
     parser.add_argument("--total_num", type=int, default=100, help="Total tests across all workers")
     parser.add_argument("--gpu", type=str, default=os.environ.get('CUDA_VISIBLE_DEVICES', ''),
                         help="CUDA_VISIBLE_DEVICES list to split among workers")
+    parser.add_argument("--density", type=int, default=-1,
+                        help="Density override for lift_oscar (sets LIFT_OSCAR_DENSITY env var). -1 means use default.")
     args = parser.parse_args()
     
     train_config = os.environ.get('TRAIN_CONFIG', 'Unknown')
@@ -240,7 +244,10 @@ def main():
 
     # Base save dir with unified date
     curr_time = time.strftime(r'%Y-%m-%d_%H:%M:%S')
-    base_save_dir = Path('eval_result') / policy_name / args.task_name / deploy_config_file.stem / curr_time
+    _save_dir = Path('eval_result') / policy_name / args.task_name / deploy_config_file.stem
+    if args.density != -1:
+        _save_dir = _save_dir / f'density_{args.density}'
+    base_save_dir = _save_dir / curr_time
     base_save_dir.mkdir(parents=True, exist_ok=True)
     out_log = base_save_dir / 'out.log'
     clean_log = base_save_dir / 'log.log'
@@ -302,7 +309,8 @@ def main():
             target=worker_run,
             name=f"Worker-{w+1}",
             args=(args, deploy_config, task_config, args.task_name, policy_name, instructions,
-                  base_save_dir, seed_q, progress, stop_event, out_log, assignments[w], status_proxy, result_q)
+                  base_save_dir, seed_q, progress, stop_event, out_log, assignments[w], status_proxy, result_q,
+                  args.density)
         )
         p.start()
         workers.append(p)

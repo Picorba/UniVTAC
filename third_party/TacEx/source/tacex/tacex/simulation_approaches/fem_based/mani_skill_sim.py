@@ -71,6 +71,10 @@ class ManiSkillSimulator(GelSightSimulator):
             sub_marker_num=self.cfg.sub_marker_num,
             marker_radius=self.radius,
             num_markers=self.cfg.marker_params.num_markers,
+            # Fix: pass sensor-specific camera intrinsic params (were missing, gsmini defaults used for all sensors)
+            # OLD (reverted to defaults): camera_to_surface and real_size were not passed
+            camera_to_surface=self.cfg.camera_to_surface,
+            real_size=self.cfg.real_size,
         )
 
         self.marker_motion_sim._gen_marker_grid()
@@ -233,7 +237,7 @@ class ManiSkillSimulator(GelSightSimulator):
         circle_radius = self.radius
         size_slot_num = 50
         base_circle_radius = circle_radius * 0.5  # 与原始实现对齐: 1.5 / 3 = 0.5 比例
-        blur_k, blur_sigma = (17, 17), 15 
+        blur_k, blur_sigma = (17, 17), 5  # OLD: blur_sigma was 15 (too aggressive, caused blurry/smeared dots)
         
         # patch 尺寸为 4 * circle_radius，用于覆盖 [-2r, 2r] 范围
         patch_size = 4 * circle_radius

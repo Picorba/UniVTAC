@@ -56,12 +56,17 @@ class Task(BaseTask):
         base_offset = self.create_noise([0.005, 0.005, 0.0])
         base_pose = Pose([0.55, 0.0, self.slot.get_pose()[2]], [1, 0, 0, 0]).add_offset(base_offset)
         self.slot.set_pose(base_pose)
+        self.domain_rand_params = {
+            'slot_dx': float(base_offset.p[0]),
+            'slot_dy': float(base_offset.p[1]),
+        }
 
     def pre_move(self):
         self.delay(10)
 
         self.move(self.atom.open_gripper(0.5))
         grasp_rotate = self.rng.uniform(-np.pi/18, np.pi/18)
+        self.domain_rand_params['grasp_rotate'] = float(grasp_rotate)
         target_pose = self.prism.get_pose().add_bias([0, 0, 0.012]).add_rotation([0, grasp_rotate, 0])
         target_mat = target_pose.to_transformation_matrix()
         cpose = construct_grasp_pose(
@@ -81,6 +86,8 @@ class Task(BaseTask):
         self.target_pose = self.slot.get_pose().add_bias([0.0, 0.0, 0.005])
         self.hole_pose = self.slot.get_pose().add_bias([0.0, 0.0, 0.0128])
         noise = self.create_noise([0.005, 0.005, 0.0])
+        self.domain_rand_params['noise_x'] = float(noise.p[0])
+        self.domain_rand_params['noise_y'] = float(noise.p[1])
         self.noise_pose = self.hole_pose.add_offset(noise)
         self.move(self.atom.place_actor(
             self.prism,

@@ -37,6 +37,10 @@ class Task(BaseTask):
         slot_offset = self.create_noise([0.005, 0.01, 0.0])
         slot_pose = Pose([0.6, 0.0, self.slot.get_pose()[2]], [1, 0, 0, 0]).add_offset(slot_offset)
         self.slot.set_pose(slot_pose)
+        self.domain_rand_params = {
+            'slot_dx': float(slot_offset.p[0]),
+            'slot_dy': float(slot_offset.p[1]),
+        }
     
     def pre_move(self):
         self.delay(10)
@@ -63,6 +67,9 @@ class Task(BaseTask):
             [[0.001, 0.004], [0.001, 0.004], 0])
         self.random_noise[:2] *= np.sign(self.rng.uniform(-1, 1, size=2))
         self.metadata['random_noise'] = self.random_noise.tolist()
+        self.domain_rand_params['grasp_bias'] = float(grasp_bias)
+        self.domain_rand_params['noise_x'] = float(self.random_noise[0])
+        self.domain_rand_params['noise_y'] = float(self.random_noise[1])
         self.hole_pose = base_pose.add_bias([-0.008, 0, 0.077]).add_rotation([0, -np.pi/6, 0])
         try_pose = self.hole_pose.add_offset(self.random_noise)
 
@@ -99,7 +106,7 @@ class Task(BaseTask):
  
     def check_mid_success(self):
         prism_pose = self.prism.get_pose().rebase(self.hole_pose)
-        return np.all(prism_pose.p[:2] < np.array([0.005, 0.005])) and prism_pose.p[2] < -0.02 and\
+        return np.all(np.abs(prism_pose.p[:2]) < np.array([0.005, 0.005])) and prism_pose.p[2] < -0.02 and\
             np.dot(prism_pose.to_transformation_matrix()[:3, 2], np.array([0, 0, 1])) > 0.99 # 8°
 
     def check_early_stop(self):
@@ -115,8 +122,12 @@ class Task(BaseTask):
         prism_pose = self.prism.get_pose().rebase(self.hole_pose)
         prism_inhand_pose = self.prism.get_pose().rebase(
             self._robot_manager.get_gripper_center_pose())
+        inhand_bias = np.abs(self.origin_inhand_pose[2] - prism_inhand_pose[2])
+        xy = np.abs(prism_pose.p[:2])
+        z = prism_pose.p[2]
+        align = np.dot(prism_pose.to_transformation_matrix()[:3, 2], np.array([0, 0, 1]))
         self.metadata['rel_pose'] = prism_pose.tolist()
-        self.metadata['inhand_bias'] = np.abs(self.origin_inhand_pose[2] - prism_inhand_pose[2])
-        return np.all(prism_pose.p[:2] < np.array([0.005, 0.005])) and prism_pose.p[2] < -z_threshold \
-            and np.dot(prism_pose.to_transformation_matrix()[:3, 2], np.array([0, 0, 1])) > 0.965 \
-            and np.abs(self.origin_inhand_pose[2] - prism_inhand_pose[2]) < 0.03
+        self.metadata['inhand_bias'] = inhand_bias
+        return np.all(xy < np.array([0.005, 0.005])) and z < -z_threshold \
+            and align > 0.965 \
+            and inhand_bias < 0.03

@@ -46,6 +46,12 @@ parser.add_argument(
     type=str,
     default=None,
 )
+parser.add_argument(
+    "--save_subdir",
+    type=str,
+    default=None,
+    help="Optional subdirectory appended to save_dir (e.g. 'density_500').",
+)
 
 args_cli = parser.parse_args()
 if args_cli.gpu is not None:
@@ -106,7 +112,7 @@ def log(msg):
 def run(task: 'BaseTask', episode_num, use_seed, start_seed, max_seed):
     suc_num, seed = 0, 0
     suc_map = []
-    number_seed = start_seed - start_seed + 1
+    number_seed = start_seed - max_seed + 1
     if start_seed != -1:
         seed = start_seed
         log(f"Starting from seed {seed}.")
@@ -182,6 +188,8 @@ def main():
     env_cfg:'BaseTaskCfg' = task_module.TaskCfg()
     env_cfg.tactile_sensor_type = task_config.get('sensor_type', 'gsmini')
     env_cfg.save_dir = Path(task_config.get("save_dir", "./data")) / task_file_name / task_config_file.stem
+    if args_cli.save_subdir:
+        env_cfg.save_dir = env_cfg.save_dir / args_cli.save_subdir
     env_cfg.decimation = task_config.get("decimation", env_cfg.decimation)
     env_cfg.save_frequency = task_config.get("save_frequency", env_cfg.save_frequency)
     env_cfg.video_frequency = task_config.get("video_frequency", env_cfg.video_frequency)

@@ -74,6 +74,9 @@ class Task(BaseTask):
             self.target = self.green_pad
             self.other_target = self.orange_pad
         self.prism.set_pose(start_pose)
+        self.domain_rand_params = {
+            'prism_type': self.choice,
+        }
 
     def pre_move(self):
         self.delay(10)

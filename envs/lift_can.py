@@ -33,6 +33,11 @@ class Task(BaseTask):
         self.can = self.cans[can_size]
         self.metadata['can_size'] = int(can_size)
         self.can.set_pose(can_pose)
+        self.domain_rand_params = {
+            'can_dx': float(can_offset.p[0]),
+            'can_dy': float(can_offset.p[1]),
+            'can_size': int(can_size),
+        }
  
     def pre_move(self):
         self.delay(10)
@@ -47,6 +52,7 @@ class Task(BaseTask):
         ])
         self.grasp_noise = self.create_noise(euler=[0, [-np.pi/6, -np.pi/18], 0])
         self.metadata['grasp_noise'] = self.grasp_noise.tolist()
+        self.domain_rand_params['grasp_pitch'] = float(self.grasp_noise.euler[1])
         target_pose = construct_grasp_pose(
             target_pose.p,
             target_mat[:3, 2],

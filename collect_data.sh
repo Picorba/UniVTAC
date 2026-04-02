@@ -8,7 +8,7 @@ MAX_SEED=${5:--1}
 EPISODE=${6:--1}
 
 if [ "$TASK_NAME" = "lift_oscar" ]; then
-    for DENSITY in 100 500 2000 5000 10000; do
+    for DENSITY in 2500; do
         echo "=========================================="
         echo "lift_oscar: collecting with density=${DENSITY}"
         echo "=========================================="

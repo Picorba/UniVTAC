@@ -266,6 +266,7 @@ class RigidActor:
         pose: 'Pose',
         density: float = 1e3,
         scale=None,
+        activate_contact_sensors: bool = False,
     ):
         asset_path = Path(asset_path)
         if not asset_path.is_absolute():
@@ -284,6 +285,7 @@ class RigidActor:
             mass_props=sim_utils.MassPropertiesCfg(density=density),
             rigid_props=rigid_props,
             scale=scale,
+            activate_contact_sensors=activate_contact_sensors,
         )
         cfg = RigidObjectCfg(
             prim_path=f"/World/envs/env_.*/{name}",
@@ -379,9 +381,11 @@ class ActorManager:
         self.actors[actor.cfg.name] = actor
         return actor
 
-    def add_rigid_from_usd_file(self, name: str, asset_path: str, pose: Pose, density: float = 1e3, scale=None):
+    def add_rigid_from_usd_file(self, name: str, asset_path: str, pose: Pose, density: float = 1e3,
+                                scale=None, activate_contact_sensors: bool = False):
         """Spawn a plain PhysX rigid body (no UIPC FEM) from a USD file."""
-        actor = RigidActor.from_usd_file(name, asset_path, pose, density=density, scale=scale)
+        actor = RigidActor.from_usd_file(name, asset_path, pose, density=density, scale=scale,
+                                         activate_contact_sensors=activate_contact_sensors)
         self.actors[name] = actor
         return actor
 

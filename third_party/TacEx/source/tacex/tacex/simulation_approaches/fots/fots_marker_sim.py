@@ -323,7 +323,7 @@ class FOTSMarkerSimulator(GelSightSimulator):
             # cv2.circle(frame,(init_y_pos,init_x_pos), 6, (255,255,255), 1, lineType=8)
 
             pt1 = (init_x_pos, init_y_pos)
-            pt2 = (x_pos + arrow_scale * int(x_pos - init_x_pos), y_pos + arrow_scale * int(y_pos - init_y_pos))
+            pt2 = (init_x_pos + arrow_scale * int(x_pos - init_x_pos), init_y_pos + arrow_scale * int(y_pos - init_y_pos))
             cv2.arrowedLine(frame, pt1, pt2, color, 2, tipLength=0.2)
 
         # draw current contact point

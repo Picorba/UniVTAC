@@ -94,7 +94,6 @@ def process_episodes_batch(hdf5_paths, save_dir):
     with h5py.File(str(hdf5_paths[0]), 'r') as f:
         try:
             f['tactile/left_tactile/rgb_marker']
-<<<<<<< HEAD:policy/TactileACT/process_data.py
             left_tac_key = 'tactile/left_tactile/rgb_marker'
             right_tac_key = 'tactile/right_tactile/rgb_marker'
         except:
@@ -102,13 +101,6 @@ def process_episodes_batch(hdf5_paths, save_dir):
             right_tac_key = 'tactile/right_gsmini/rgb_marker'
     data_paths.append(left_tac_key)
     data_paths.append(right_tac_key)
-=======
-            data_paths.append('tactile/left_tactile/rgb_marker')
-            data_paths.append('tactile/right_tactile/rgb_marker')
-        except:
-            data_paths.append('tactile/left_gsmini/rgb_marker')
-            data_paths.append('tactile/right_gsmini/rgb_marker')
->>>>>>> refs/remotes/upstream/main:policy/ViTAL/process_data.py
 
     batch_data = handler.batch_gather_hdf5(
         [str(p) for p in hdf5_paths],

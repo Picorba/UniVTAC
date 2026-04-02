@@ -42,7 +42,6 @@ from .robot.robot import RobotManager
 from .robot.robot_cfg import *
 from .sensors.camera import CameraManager, CameraCfg
 from .sensors.tactile import TactileManager
-from .sensors.contact import ContactSensorManager, ObjectContactSensorCfg
 
 
 @configclass
@@ -159,8 +158,6 @@ class BaseTaskCfg(DirectRLEnvCfg):
         )
     ]
 
-    contact_sensors: list = []  # list[ObjectContactSensorCfg]
-
     robot: RobotCfg = None
     tactile_sensor_type:Literal['gsmini', 'xensews', 'gf225'] = 'gsmini'
 
@@ -275,7 +272,6 @@ class BaseTask(UipcRLEnv):
         # add sensors
         self._camera_manager = CameraManager(self.cfg.cameras, self)
         self._tactile_manager = TactileManager(self.cfg.robot.tactiles, self)
-        self._contact_sensor_manager = ContactSensorManager(self.cfg.contact_sensors, self)
 
     def _setup_base_scene(self):
         # add robot
@@ -608,8 +604,6 @@ class BaseTask(UipcRLEnv):
             obs['tactile'] = self._tactile_manager.get_observations(self.cfg.obs_data_type['tactile'])
         if 'actor' in self.cfg.obs_data_type:
             obs['actor'] = self._actor_manager.get_observations()
-        if 'contact' in self.cfg.obs_data_type:
-            obs['contact'] = self._contact_sensor_manager.get_observations()
         return obs
     
     def clean_cache(self, mean_steps:float=0.0, result:str=None):
@@ -709,15 +703,30 @@ class BaseTask(UipcRLEnv):
                 if self.cfg.debug_vis:
                     add_visual_box(action.target_pose, 'target')
 
+                # Maintain gripping force throughout arm-only motions.
+                if (action.action == 'move'
+                        and self.cfg.use_force_grasp
+                        and self._gripper_grasping):
+                    control_seq['gripper'] = {
+                        'status': 'success',
+                        'num_steps': -2,
+                        'target_force': self.cfg.grasp_force,
+                    }
+
             if action.action == 'gripper' or action.action == 'all':
+                # Opening the gripper ends force-grasp mode.
+                if action.target_gripper_pos > 0.5:
+                    self._gripper_grasping = False
+
                 if self.mode in ['collect', 'eval_test'] or (self.mode == 'eval' and self.in_pre_move):
                     if self.cfg.use_force_grasp:
                         magnitude = action.args.get('gripper_force') or self.cfg.grasp_force
+                        # Positive force = closing (target_pos ≤ 0.5), negative = opening.
+                        sign = 1.0 if action.target_gripper_pos <= 0.5 else -1.0
                         control_seq['gripper'] = {
                             'status': 'success',
                             'num_steps': -2,
-                            'target_force': magnitude,
-                            'force_steps': action.args.get('gripper_force_steps', 'auto'),
+                            'target_force': sign * magnitude,
                         }
                     elif self.cfg.use_adaptive_grasp:
                         target_pos = self._robot_manager.gripper_percent2qpos(action.target_gripper_pos)
@@ -789,10 +798,7 @@ class BaseTask(UipcRLEnv):
                 idx += 1
         elif gripper_steps == -2:  # force control
             idx, gripper_active = 0, True
-            gripper_planner = self.force_control_gripper(
-                gripper_seq['target_force'],
-                steps=gripper_seq.get('force_steps', 'auto'),
-            )
+            gripper_planner = self.force_control_gripper(gripper_seq['target_force'])
             while True:
                 # When running alongside arm motion, stop as soon as arm finishes.
                 # When standalone (no arm), let the generator decide when to stop.
@@ -876,27 +882,21 @@ class BaseTask(UipcRLEnv):
 
         return exec_success, self.eval_success
 
-    def force_control_gripper(self, target_force: float, steps: int | Literal['auto'] = 'auto',
-                              max_steps: int = 300, stable_window: int = 20, stable_tol: float = 1e-5):
-        """Generator that applies a constant gripping force for a fixed or auto-detected duration.
+    def force_control_gripper(self, target_force: float, max_steps: int = 300,
+                              stable_window: int = 20, stable_tol: float = 1e-5):
+        """Generator that applies a constant gripping force until the gripper stabilizes.
 
-        Yields ``(target_force, active)`` each step.
+        Yields ``(target_force, active)`` each step. Stops early once the gripper
+        position has not moved more than *stable_tol* metres over the last
+        *stable_window* steps (contact established and finger settled), or after
+        *max_steps* steps at the latest.
 
         Args:
             target_force: Gripping force in Newtons (positive = closing).
-            steps: Number of simulation steps to apply the force.  When ``'auto'``, stops
-                   early once the gripper position has not moved more than *stable_tol* metres
-                   over the last *stable_window* steps, or after *max_steps* at the latest.
-            max_steps: Hard upper bound used only in ``'auto'`` mode.
-            stable_window: Window size for stabilisation detection in ``'auto'`` mode.
+            max_steps: Hard upper bound on simulation steps.
+            stable_window: Number of consecutive steps used to detect stabilization.
             stable_tol: Position range (m) below which the gripper is considered stable.
         """
-        if steps != 'auto':
-            for _ in range(steps):
-                yield target_force, True
-            yield target_force, False
-            return
-
         pos_history = []
         for _ in range(max_steps):
             pos_history.append(self._robot_manager.get_gripper_qpos())

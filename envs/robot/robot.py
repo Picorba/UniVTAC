@@ -238,12 +238,14 @@ class RobotManager:
         self.robot.set_joint_position_target(joint_pos)
         self.robot.write_joint_state_to_sim(joint_pos, joint_vel)
     
-    def get_observations(self, data_type:list[str]=['joint', 'ee']) -> dict:
+    def get_observations(self, data_type:list[str]=['joint', 'ee', 'gripper_force']) -> dict:
         obs = {}
         if 'ee' in data_type:
             obs['ee'] = self.get_ee_pose().totensor(device=self.device)
         if 'joint' in data_type:
             obs['joint'] = self.robot.data.joint_pos.squeeze(0)
+        if 'gripper_force' in data_type:
+            obs['gripper_force'] = self.get_gripper_effort()
         return obs
     
     def get_grasp_perfect_direction(self):

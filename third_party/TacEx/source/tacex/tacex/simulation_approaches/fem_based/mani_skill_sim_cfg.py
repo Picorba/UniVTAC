@@ -19,7 +19,7 @@ class ManiSkillSimulatorCfg(GelSightSimulatorCfg):
 
     marker_shape: tuple[int, int] = (7, 9)
 
-    marker_interval: tuple[float, float] = (2.40625, 2.45833)
+    marker_interval: tuple[float, float] = (2.0625, 2.0625)
 
     marker_rotation_range: float = 0.0
 

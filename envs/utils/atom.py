@@ -305,7 +305,7 @@ class Atom:
         return [Action("move", target_pose=target_pose)]
     
     def close_gripper(self, pos: float = 0.0, depth_threshold:Literal['auto']|float='auto',
-                      force: float = None):
+                      force: float = None, steps: int | Literal['auto'] = 'auto'):
         """Close the gripper.
 
         Args:
@@ -313,6 +313,9 @@ class Atom:
             depth_threshold: Tactile depth threshold for adaptive grasp ('auto' uses cfg value).
             force: Gripping force in Newtons for force-control mode.  If None, falls back to
                    ``cfg.grasp_force``.  Has no effect when ``use_force_grasp`` is False.
+            steps: Number of simulation steps to apply the force.  'auto' keeps the current
+                   behaviour of stopping once the gripper position stabilises.  Has no effect
+                   when ``use_force_grasp`` is False.
         """
         if depth_threshold == 'auto':
             if self.task.cfg.use_adaptive_grasp:
@@ -320,10 +323,26 @@ class Atom:
             else:
                 depth_threshold = None
         return [Action("close", target_gripper_pos=pos,
-                       gripper_depth_threshold=depth_threshold, gripper_force=force)]
+                       gripper_depth_threshold=depth_threshold, gripper_force=force,
+                       gripper_force_steps=steps)]
 
-    def open_gripper(self, pos: float = 1.0, depth_threshold: float = None):
-        return [Action("open", target_gripper_pos=pos, gripper_depth_threshold=depth_threshold)]
+    def open_gripper(self, pos: float = 1.0, depth_threshold: float = None, force: float = None,
+                     steps: int | Literal['auto'] = 'auto'):
+        """Open the gripper.
+
+        Args:
+            pos: Target opening in [0, 1] (only used in position / adaptive mode).
+            depth_threshold: Tactile depth threshold for adaptive mode.
+            force: Opening force magnitude in Newtons for force-control mode.
+                   If None, falls back to ``cfg.grasp_force``.  Has no effect
+                   when ``use_force_grasp`` is False.
+            steps: Number of simulation steps to apply the force.  'auto' keeps the current
+                   behaviour of stopping once the gripper position stabilises.  Has no effect
+                   when ``use_force_grasp`` is False.
+        """
+        return [Action("open", target_gripper_pos=pos,
+                       gripper_depth_threshold=depth_threshold, gripper_force=-force if force is not None else None,
+                       gripper_force_steps=steps)]
 
     def back_to_origin(self):
         return [Action("move", target_pose=self.robot.origin_pose)]

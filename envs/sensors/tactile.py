@@ -1,8 +1,13 @@
 import torch
 import numpy as np
+import os
+import cv2
 from tacex import GelSightSensor
 from tacex_assets.sensors.gf225.gf225_cfg import GF225Cfg
 from tacex.simulation_approaches.fem_based import ManiSkillSimulatorCfg
+from tacex.simulation_approaches.fots import FOTSMarkerSimulatorCfg
+
+from isaaclab.sensors import FrameTransformerCfg
 
 from isaaclab.utils import configclass
 import isaaclab.utils.math as math_utils
@@ -42,8 +47,44 @@ def create_gelsight_mini_cfg(
     resolution = (320, 240),
     update_period = 1/120,
     data_type:list[str] = ["camera_depth", "tactile_rgb"],
+    contact_prim_path: str | None = None,
 ):
     from tacex_assets.sensors.gelsight_mini.gsmini_cfg import GelSightMiniCfg
+
+    if contact_prim_path is not None:
+        marker_motion_sim_cfg = FOTSMarkerSimulatorCfg(
+            lamb=[0.00125, 0.00021, 0.00038],
+            pyramid_kernel_size=[51, 21, 11, 5],
+            kernel_size=5,
+            marker_params=FOTSMarkerSimulatorCfg.MarkerParams(
+                num_markers_col=11,
+                num_markers_row=9,
+                num_markers=99,
+                x0=15,
+                y0=26,
+                dx=26,
+                dy=29,
+            ),
+            tactile_img_res=resolution,
+            device="cuda",
+            frame_transformer_cfg=FrameTransformerCfg(
+                prim_path=gelpad_prim_path,
+                target_frames=[FrameTransformerCfg.FrameCfg(prim_path=contact_prim_path)],
+                debug_vis=False,
+            ),
+        )
+    else:
+        marker_motion_sim_cfg = ManiSkillSimulatorCfg(
+            tactile_img_res=resolution,
+            marker_shape=(9, 7),
+            marker_interval=(2.40625, 2.45833),
+            sub_marker_num=0,
+            marker_radius=6,
+            camera_to_surface=0.0283,
+            real_size=(0.0266, 0.0209),
+            sensor_type='gsmini',
+        )
+
     sensor_cfg = GelSightMiniCfg(
         prim_path=prim_path,
         sensor_camera_cfg=GelSightMiniCfg.SensorCameraCfg(
@@ -56,19 +97,11 @@ def create_gelsight_mini_cfg(
         device="cuda",
         debug_vis=False,  # for rendering sensor output in the gui
         update_period=1/120,
-        marker_motion_sim_cfg=ManiSkillSimulatorCfg(
-            tactile_img_res=resolution,
-            marker_shape=(9, 7),
-            marker_interval=(2.40625, 2.45833),
-            sub_marker_num=0,
-            marker_radius=6,
-            camera_to_surface=0.0283,
-            real_size=(0.0266, 0.0209),
-            sensor_type='gsmini',
-        ),
+        marker_motion_sim_cfg=marker_motion_sim_cfg,
         data_types=data_type
     )
-    sensor_cfg.marker_motion_sim_cfg.marker_params.num_markers = 64
+    if contact_prim_path is None:
+        sensor_cfg.marker_motion_sim_cfg.marker_params.num_markers = 63
     sensor_cfg.optical_sim_cfg = sensor_cfg.optical_sim_cfg.replace(
         with_shadow=False,
         tactile_img_res=resolution,
@@ -163,8 +196,38 @@ def create_xensews_cfg(
     resolution = (320, 240),
     update_period = 1/120,
     data_type:list[str] = ["camera_depth", "tactile_rgb"],
+    contact_prim_path: str | None = None,
 ) -> TactileCfg:
     from tacex_assets.sensors.xensews.xensews_cfg import XenseWSCfg
+
+    if contact_prim_path is not None:
+        marker_motion_sim_cfg = FOTSMarkerSimulatorCfg(
+            lamb=[0.00125, 0.00021, 0.00038],
+            pyramid_kernel_size=[51, 21, 11, 5],
+            kernel_size=5,
+            marker_params=FOTSMarkerSimulatorCfg.MarkerParams(
+                num_markers_col=11,
+                num_markers_row=9,
+                num_markers=99,
+                x0=15,
+                y0=26,
+                dx=26,
+                dy=29,
+            ),
+            tactile_img_res=resolution,
+            device="cuda",
+            frame_transformer_cfg=FrameTransformerCfg(
+                prim_path=gelpad_prim_path,
+                target_frames=[FrameTransformerCfg.FrameCfg(prim_path=contact_prim_path)],
+                debug_vis=False,
+            ),
+        )
+    else:
+        marker_motion_sim_cfg = ManiSkillSimulatorCfg(
+            tactile_img_res=resolution,
+            sub_marker_num=0,
+            sensor_type='xensews',
+        )
 
     sensor_cfg = XenseWSCfg(
         prim_path=prim_path,
@@ -178,14 +241,11 @@ def create_xensews_cfg(
         device="cuda",
         debug_vis=False,  # for rendering sensor output in the gui
         update_period=update_period,
-        marker_motion_sim_cfg=ManiSkillSimulatorCfg(
-            tactile_img_res=resolution,
-            sub_marker_num=0,
-            sensor_type='xensews',
-        ),
+        marker_motion_sim_cfg=marker_motion_sim_cfg,
         data_types=data_type
     )
-    sensor_cfg.marker_motion_sim_cfg.marker_params.num_markers = 1200
+    if contact_prim_path is None:
+        sensor_cfg.marker_motion_sim_cfg.marker_params.num_markers = 1200
     sensor_cfg.optical_sim_cfg = sensor_cfg.optical_sim_cfg.replace(
         with_shadow=False,
         tactile_img_res=resolution,
@@ -217,6 +277,7 @@ def create_tactile_cfg(
     name: str = "tactile_sensor",
     sensor_type:Literal['gsmini', 'xensews', 'gf225'] = "gsmini",
     data_type:list[str] = ["camera_depth", "tactile_rgb"],
+    contact_prim_path: str | None = None,
 ) -> TactileCfg:
     if sensor_type == "gsmini":
         return create_gelsight_mini_cfg(
@@ -225,6 +286,7 @@ def create_tactile_cfg(
             gelpad_attachment_body_name=gelpad_attachment_body_name,
             name=name,
             data_type=data_type,
+            contact_prim_path=contact_prim_path,
         )
     elif sensor_type == "xensews":
         return create_xensews_cfg(
@@ -233,6 +295,7 @@ def create_tactile_cfg(
             gelpad_attachment_body_name=gelpad_attachment_body_name,
             name=name,
             data_type=data_type,
+            contact_prim_path=contact_prim_path,
         )
     elif sensor_type == "gf225":
         return create_gf225_cfg(
@@ -263,17 +326,80 @@ class VisualTactileSensor:
         # self.scene.sensors[f'tactile_{self.cfg.name}'] = self.sensor
     
     def setup(self):
+        import json, pathlib
         self.device = self.uipc_sim.cfg.device
-        init_pts = self.gelpad._data.nodal_pos_w[self.attachment.attachment_points_idx].cpu().numpy()
-        init_world_trans = self.gelpad.init_world_transform.cpu().numpy()
-        self.origin_pts = (init_pts - init_world_trans[:3, 3]) @ (init_world_trans[:3, :3].T).T
+        folder = "/workspace/tacex"
+        cache_path = folder / pathlib.Path(f"attachment_cache_{self.name}.json")
+
+        if cache_path.exists():
+            # ── Fast path: bypasses all PhysX scene queries ──────────────
+            print(f"[TactileSensor:{self.name}] Loading attachment cache from {cache_path}")
+            cache = json.loads(cache_path.read_text())
+
+            # Restore the three fields _compute_aim_positions and _create_animation need
+            self.attachment.attachment_points_idx = list(cache["attachment_points_idx"])
+            self.attachment.attachment_offsets = np.array(
+                cache["attachment_offsets"], dtype=np.float64
+            )
+            self.attachment.num_attachment_points_per_obj = int(
+                cache["num_attachment_points_per_obj"]
+            )
+            self.origin_pts = np.array(cache["origin_pts"], dtype=np.float64)
+
+        else:
+            # ── Slow path: headful only, PhysX sweep must succeed ────────
+            # The constructor already ran compute_attachment_data — check result
+            idx = self.attachment.attachment_points_idx
+            if idx is None or len(idx) == 0:
+                raise RuntimeError(
+                    f"[TactileSensor:{self.name}] attachment_points_idx is empty.\n"
+                    f"  This means get_physx_scene_query_interface().sweep_sphere_closest()\n"
+                    f"  returned no hits — USD stage was not fully cooked at construction.\n"
+                    f"  Run once headful to generate: attachment_cache_{self.name}.json\n"
+                    f"  gelpad_prim_path     : {self.cfg.gelpad_cfg.prim_path}\n"
+                    f"  attachment_body_name : {self.cfg.gelpad_attachment_cfg.body_name}"
+                )
+
+            init_world_trans = self.gelpad.init_world_transform.cpu().numpy()
+            init_pts = self.gelpad._data.nodal_pos_w[idx].cpu().numpy()
+            self.origin_pts = (
+                init_pts - init_world_trans[:3, 3]
+            ) @ init_world_trans[:3, :3]
+
+             # In VisualTactileSensor.setup(), run once headful — then remove
+            import json, pathlib
+            cache = {
+                "attachment_points_idx":         self.attachment.attachment_points_idx,
+                "attachment_offsets":            self.attachment.attachment_offsets.tolist(),
+                "num_attachment_points_per_obj": int(self.attachment.num_attachment_points_per_obj),
+                "origin_pts":                    self.origin_pts.tolist(),
+            }
+            # Convert idx — may be list or np.ndarray
+            if hasattr(cache["attachment_points_idx"], "tolist"):
+                cache["attachment_points_idx"] = cache["attachment_points_idx"].tolist()
+            else:
+                cache["attachment_points_idx"] = list(cache["attachment_points_idx"])
+
+            pathlib.Path(f"attachment_cache_{self.name}.json").write_text(
+                json.dumps(cache, indent=2)
+            )
+            print(f"[CACHE] {self.name}: {cache['num_attachment_points_per_obj']} attachment points")
+
+
+        # ── Common path (both headful and headless) ───────────────────────
         attach_pts = self.attachment.attachment_offsets
+        if self.origin_pts.shape[0] != attach_pts.shape[0]:
+            raise RuntimeError(
+                f"[TactileSensor:{self.name}] Point count mismatch: "
+                f"origin_pts={self.origin_pts.shape[0]}, attachment_offsets={attach_pts.shape[0]}.\n"
+                f"Cache may be stale — delete attachment_cache_{self.name}.json and regenerate."
+            )
+
         init_trans = estimate_rigid_transform(self.origin_pts, attach_pts)
-        self.attach_to_init = np.linalg.inv(init_trans)
-        self.attach_to_init = torch.tensor(self.attach_to_init, dtype=torch.float64, device=self.device)
-
-        self.sensor.marker_motion_simulator.marker_motion_sim.init_vertices()
-
+        self.attach_to_init = torch.tensor(
+            np.linalg.inv(init_trans), dtype=torch.float64, device=self.device
+        )
+        
     def get_attach_pose(self):
         if type(self.attachment.isaaclab_rigid_object) is Articulation:
             # this only works when rigid body is an articulation
@@ -329,7 +455,6 @@ class VisualTactileSensor:
     def _reset_idx(self):
         self.init_pose_mat = self.get_attach_pose().to_transformation_matrix()
         # self.gelpad.write_vertex_positions_to_sim(vertex_positions=self.gelpad.init_vertex_pos)
-    
     def get_min_depth(self):
         return torch.min(self.sensor.data.output['height_map']).item()
 
@@ -373,5 +498,10 @@ class TactileManager:
             tact._reset_idx()
 
     def setup(self):
-        for tact in self.tactiles.values():
-            tact.setup()
+        for name, tact in self.tactiles.items():
+            try:
+                tact.setup()
+            except RuntimeError as e:
+                raise RuntimeError(
+                    f"TactileManager: failed to setup sensor '{name}'"
+                ) from e

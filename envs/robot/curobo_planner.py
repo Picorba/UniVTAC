@@ -76,7 +76,7 @@ class CuroboPlanner:
             rotation_threshold=0.01,
             high_precision=True,
             collision_checker_type=CollisionCheckerType.MESH,
-            collision_activation_distance=0.4
+            collision_activation_distance=0.4,
         )
         self.motion_gen = MotionGen(motion_gen_config)
         self.motion_gen.warmup()

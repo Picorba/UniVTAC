@@ -185,6 +185,8 @@ pip install flatdict
 cd ../isaaclab
 ./isaaclab.sh --install
 ```
+For curobo on H100 you will need cuda >12.6
+For data collection on headless mode you will need to cache some value
 Check the data collection script :
 ```bash
 python scripts/collect_data.py     lift_bottle demo     --start_seed 1     --max_seed 1     --episode_num 1     --gpu 0

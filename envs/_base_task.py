@@ -4,7 +4,7 @@ import time
 import torch
 import pickle
 import torchvision
-
+import os
 from envs.utils.data import HDF5Handler, VideoHandler
 import numpy as np
 from pathlib import Path
@@ -102,13 +102,23 @@ class BaseTaskCfg(DirectRLEnvCfg):
         replicate_physics=True,
         lazy_sensor_update=True,
     )
+    random_background: bool = True
+    random_light: bool = True
+    BACKGROUND_FILES: list = [
+        str(SCENE_ASSETS_ROOT / 'base0.exr'),
+        str(SCENE_ASSETS_ROOT / 'base1.exr'),
+        str(SCENE_ASSETS_ROOT / 'base2.exr'),
+        str(SCENE_ASSETS_ROOT / 'base3.exr'),
+        str(SCENE_ASSETS_ROOT / 'base4.exr'),
+    ]
 
+    LIGHT_INTENSITIES: list = [1500, 3000, 6000]  # low / medium / high
     # light
     light = AssetBaseCfg(
         prim_path="/World/light",
         spawn=sim_utils.DomeLightCfg(
-            color=(0.75, 0.75, 0.75), intensity=3000.0,
-            texture_file=str(SCENE_ASSETS_ROOT / 'base0.exr')
+            color=(0.75, 0.75, 0.75), intensity=LIGHT_INTENSITIES[0],
+            texture_file=str(SCENE_ASSETS_ROOT / BACKGROUND_FILES[0])
         ),
     )
 
@@ -172,6 +182,12 @@ class BaseTaskCfg(DirectRLEnvCfg):
     keep_contact: bool = False
     max_save_frames: int = 1000
 
+    fots_contact_prim_path: str | None = None
+    """When set, FOTS marker motion simulation is used instead of ManiSkill (FEM-based).
+    Must be the USD prim path of the contact object, e.g. "/World/envs/env_.*/bottle".
+    Only supported for gsmini and xensews sensor types (gf225 requires Taxim optical sim).
+    """
+
     # some filler values, needed for DirectRLEnv
     episode_length_s = 0
     action_space = 0
@@ -228,12 +244,13 @@ class BaseTask(UipcRLEnv):
     
     def load_robot_and_sensors(self, cfg:BaseTaskCfg):
         data_type = ["camera_depth", "tactile_rgb", "marker_rgb", "marker_motion"]
+        contact_prim_path = getattr(cfg, 'fots_contact_prim_path', None)
         if cfg.tactile_sensor_type == 'gsmini':
-            cfg.robot = create_franka_gsmini_gripper(data_type=data_type)
+            cfg.robot = create_franka_gsmini_gripper(data_type=data_type, contact_prim_path=contact_prim_path)
         elif cfg.tactile_sensor_type == 'gf225':
             cfg.robot = create_franka_gf225_gripper(data_type=data_type)
         elif cfg.tactile_sensor_type == 'xensews':
-            cfg.robot = create_franka_xensews_gripper(data_type=data_type)
+            cfg.robot = create_franka_xensews_gripper(data_type=data_type, contact_prim_path=contact_prim_path)
         else:
             raise ValueError(f'Unknown tactile sensor type: {cfg.tactile_sensor_type}')
         
@@ -400,17 +417,17 @@ class BaseTask(UipcRLEnv):
 
         self.pre_move()
         self.in_pre_move = False
-
+        # after all stepping + render
+        
         # update render to avoid artifacts
         for _ in range(5):
             self._update_render()
-
+        
         if self.mode == 'eval':
             self.delay()
 
         self.atom_id = 0
         self.atom_tag = ''
-
         return ret
 
     # def _reset_actors(self):
@@ -421,6 +438,35 @@ class BaseTask(UipcRLEnv):
 
         if self.cfg.random_texture:
             Actor._set_texture('/World/envs/env_0/ground_plate', 'random', self.rng)
+
+
+        if self.cfg.random_background or self.cfg.random_light:
+            from pxr import UsdLux
+            import omni.usd
+
+            stage = omni.usd.get_context().get_stage()
+            # Get handle on existing prim — do NOT call .Define() as it re-creates
+            # Use UsdLux.DomeLight(prim) to cast, consistent with Isaac Lab's own
+            # spawn_light implementation (isaaclab/sim/spawners/lights/lights.py)
+            light_prim = stage.GetPrimAtPath(self.cfg.light.prim_path)
+            dome_light = UsdLux.DomeLight(light_prim)
+
+            if self.cfg.random_background:
+                self.cfg.i_bg = int(self.rng.integers(0, len(self.cfg.BACKGROUND_FILES)))
+                new_texture = self.cfg.BACKGROUND_FILES[self.cfg.i_bg]
+                self.cfg.light.spawn.texture_file = new_texture
+                dome_light.GetTextureFileAttr().Set(new_texture)
+
+            if self.cfg.random_light:
+                self.cfg.i_light = int(self.rng.integers(0, len(self.cfg.LIGHT_INTENSITIES)))
+                new_intensity = float(self.cfg.LIGHT_INTENSITIES[self.cfg.i_light])
+                self.cfg.light.spawn.intensity = new_intensity
+                dome_light.GetIntensityAttr().Set(new_intensity)
+
+        # always log — unconditional
+
+        self.domain_rand_params['i_bg'] = self.cfg.BACKGROUND_FILES[self.cfg.i_bg]
+        self.domain_rand_params['i_light'] = self.cfg.LIGHT_INTENSITIES[self.cfg.i_light]
         self._tactile_manager._reset_idx()
         self._actor_manager._reset_idx(self.rng)
         self._robot_manager._reset_idx()
@@ -597,6 +643,9 @@ class BaseTask(UipcRLEnv):
             'atom': {
                 'id': self.atom_id,
                 'tag': self.atom_tag
+            },
+            'language': {
+                'instruction': self.instruction
             }
         }
 
@@ -718,6 +767,7 @@ class BaseTask(UipcRLEnv):
                             'num_steps': -2,
                             'target_force': magnitude,
                             'force_steps': action.args.get('gripper_force_steps', 'auto'),
+                            'target_pos': action.target_gripper_pos,  # [0,1]; None = no position limit
                         }
                     elif self.cfg.use_adaptive_grasp:
                         target_pos = self._robot_manager.gripper_percent2qpos(action.target_gripper_pos)
@@ -791,6 +841,7 @@ class BaseTask(UipcRLEnv):
             idx, gripper_active = 0, True
             gripper_planner = self.force_control_gripper(
                 gripper_seq['target_force'],
+                target_pos=gripper_seq.get('target_pos'),
                 steps=gripper_seq.get('force_steps', 'auto'),
             )
             while True:
@@ -876,29 +927,49 @@ class BaseTask(UipcRLEnv):
 
         return exec_success, self.eval_success
 
-    def force_control_gripper(self, target_force: float, steps: int | Literal['auto'] = 'auto',
+    def force_control_gripper(self, target_force: float, target_pos: float = None,
+                              steps: int | Literal['auto'] = 'auto',
                               max_steps: int = 300, stable_window: int = 20, stable_tol: float = 1e-5):
-        """Generator that applies a constant gripping force for a fixed or auto-detected duration.
+        """Generator that applies a gripping force, optionally stopping at a target position.
 
         Yields ``(target_force, active)`` each step.
 
         Args:
-            target_force: Gripping force in Newtons (positive = closing).
-            steps: Number of simulation steps to apply the force.  When ``'auto'``, stops
-                   early once the gripper position has not moved more than *stable_tol* metres
-                   over the last *stable_window* steps, or after *max_steps* at the latest.
-            max_steps: Hard upper bound used only in ``'auto'`` mode.
-            stable_window: Window size for stabilisation detection in ``'auto'`` mode.
-            stable_tol: Position range (m) below which the gripper is considered stable.
+            target_force: Gripping force in Newtons (positive = closing, negative = opening).
+            target_pos:   Target openness in [0, 1] (0 = fully closed, 1 = fully open).
+                          When provided, the generator stops as soon as the gripper reaches
+                          or passes the target qpos in the direction of the force.
+                          When None, behaviour is unchanged (force-only).
+            steps: Number of simulation steps.  ``'auto'`` stops when stable or target reached.
+            max_steps: Hard upper bound in ``'auto'`` mode.
+            stable_window: Window size for stabilisation detection.
+            stable_tol: Position range (m) considered stable.
         """
+        target_qpos = (self._robot_manager.gripper_percent2qpos(target_pos)
+                       if target_pos is not None else None)
+
+        def _target_reached():
+            if target_qpos is None:
+                return False
+            current = self._robot_manager.get_gripper_qpos()
+            # closing force (positive) → qpos decreases; opening force (negative) → qpos increases
+            if target_force >= 0:
+                return current <= target_qpos
+            else:
+                return current >= target_qpos
+
         if steps != 'auto':
             for _ in range(steps):
+                if _target_reached():
+                    break
                 yield target_force, True
             yield target_force, False
             return
 
         pos_history = []
         for _ in range(max_steps):
+            if _target_reached():
+                break
             pos_history.append(self._robot_manager.get_gripper_qpos())
             if len(pos_history) > stable_window:
                 pos_history.pop(0)

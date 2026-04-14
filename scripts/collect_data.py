@@ -60,7 +60,7 @@ if args_cli.gpu is not None:
 from isaaclab.app import AppLauncher
 AppLauncher.add_app_launcher_args(parser)
 
-# parse the arguments
+
 args_cli.enable_cameras = True
 args_cli.num_envs = 1
 
@@ -89,7 +89,7 @@ task_config, task_config_file = get_config(
 )
 
 if task_config.get('render_frequency', 1) == 0:
-    args_cli.livestream = 2
+    args_cli.livestream = 0
 
 # launch omniverse app, must done before importing anything from omni.isaac
 app_launcher = AppLauncher(args_cli)
@@ -207,7 +207,7 @@ def main():
     log(f"Task Name: {task_file_name}")
     log(f"Config Name: {task_config_file.stem}")
     log(f"Task Config: \n{json.dumps(task_config, ensure_ascii=False, indent=4)}\n{'-' * 20}\n")
-    log(f"Env Config: \n{env_cfg}\n{'-' * 20}\n")
+    #log(f"Env Config: \n{env_cfg}\n{'-' * 20}\n")
     log(f"Init cost {init_cost:.2f} seconds, devices: {os.environ.get('CUDA_VISIBLE_DEVICES')}")
     run(
         task,

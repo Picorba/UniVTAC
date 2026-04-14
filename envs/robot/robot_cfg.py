@@ -24,7 +24,7 @@ class RobotCfg:
     adaptive_grasp_depth_threshold: float = 27.5 # in mm, used for grasping
     contact_threshold: tuple[float, float] = (27.5, 28.0) # in mm, used in `gravity_rotate` api
 
-def create_franka_gsmini_gripper(data_type:list[str]):
+def create_franka_gsmini_gripper(data_type:list[str], contact_prim_path:str|None=None):
     robot = FRANKA_PANDA_ARM_GSMINI_GRIPPER_HIGH_PD_HIGH_RES_UIPC_CFG.replace(
         prim_path="/World/envs/env_.*/Robot",
         init_state=ArticulationCfg.InitialStateCfg(
@@ -48,6 +48,7 @@ def create_franka_gsmini_gripper(data_type:list[str]):
             name="left_tactile",
             sensor_type="gsmini",
             data_type=data_type,
+            contact_prim_path=contact_prim_path,
         ),
         create_tactile_cfg(
             prim_path="/World/envs/env_.*/Robot/gelsight_mini_case_right",
@@ -56,6 +57,7 @@ def create_franka_gsmini_gripper(data_type:list[str]):
             name="right_tactile",
             sensor_type="gsmini",
             data_type=data_type,
+            contact_prim_path=contact_prim_path,
         )
     ]
     return RobotCfg(
@@ -112,7 +114,7 @@ def create_franka_gf225_gripper(data_type:list[str]):
         contact_threshold=(25.5, 26.3)
     )
 
-def create_franka_xensews_gripper(data_type:list[str]):
+def create_franka_xensews_gripper(data_type:list[str], contact_prim_path:str|None=None):
     robot = FRANKA_PANDA_ARM_XENSEWS_GRIPPER_HIGH_PD_HIGH_RES_UIPC_CFG.replace(
         prim_path="/World/envs/env_.*/Robot",
         init_state=ArticulationCfg.InitialStateCfg(
@@ -136,6 +138,7 @@ def create_franka_xensews_gripper(data_type:list[str]):
             name="left_tactile",
             sensor_type="xensews",
             data_type=data_type,
+            contact_prim_path=contact_prim_path,
         ),
         create_tactile_cfg(
             prim_path="/World/envs/env_.*/Robot/XenseWS_right",
@@ -144,6 +147,7 @@ def create_franka_xensews_gripper(data_type:list[str]):
             name="right_tactile",
             sensor_type="xensews",
             data_type=data_type,
+            contact_prim_path=contact_prim_path,
         )
     ]
     return RobotCfg(

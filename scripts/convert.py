@@ -88,21 +88,16 @@ simulation_app = app_launcher.app
 
 """Rest everything follows."""
 
-import contextlib
 import os
 import numpy as np
 
-import carb
-import isaacsim.core.utils.stage as stage_utils
 import omni.kit.app
 
 from isaaclab.sim.schemas import schemas_cfg
 from isaaclab.utils.assets import check_file_path
-from isaaclab.utils.dict import print_dict
 
 import omni
 import omni.kit.commands
-import omni.usd
 from omni.physx.scripts import deformableUtils
 from isaacsim.core.utils.extensions import enable_extension
 from pxr import Gf, Tf, Usd, UsdGeom, UsdPhysics, UsdUtils

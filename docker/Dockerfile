@@ -1,5 +1,5 @@
 # For TacEx docker image
-ARG ISAACLAB_BASE_IMAGE_ARG=isaac-lab-base
+ARG ISAACLAB_BASE_IMAGE_ARG=isaac-lab-base:2.1.1
 FROM ${ISAACLAB_BASE_IMAGE_ARG} AS base
 
 SHELL ["/bin/bash", "-c"]
@@ -22,7 +22,8 @@ RUN --mount=type=cache,target=/var/cache/apt \
     apt-get update && apt-get install -y --no-install-recommends \
     build-essential gcc-11 g++-11 python3.10-dev \
     git git-lfs wget ffmpeg nano tmux \
-    pkg-config zip unzip ca-certificates && \
+    pkg-config zip unzip ca-certificates \
+    xvfb x11-utils && \
     apt -y autoremove && apt clean autoclean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -31,7 +32,7 @@ ENV CUDA_HOME=/usr/local/cuda
 ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 ENV PATH=/usr/local/cuda/bin:$PATH
 
-FROM nvcr.io/nvidia/cuda:12.4.0-devel-ubuntu22.04 AS cuda-devel
+FROM nvcr.io/nvidia/cuda:12.6.0-devel-ubuntu22.04 AS cuda-devel
 
 FROM base
 COPY --from=cuda-devel /usr/local/cuda /usr/local/cuda
@@ -59,7 +60,12 @@ RUN cd /opt && \
 ENV VCPKG_ROOT=/opt/vcpkg
 ENV CMAKE_TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake
 
-# ── 6. Copy code (invalidates from here down) ─────────────────────────────────
+ARG CACHEBUST=1
+# ── 6. IsaacLab install (rarely changes) ──────────────────────────────────────
+RUN /isaac-sim/python.sh -m pip install pip==23.* && \
+    /isaac-sim/python.sh -m pip install setuptools==65.* && \
+    /isaac-sim/python.sh -m pip install flatdict && \
+    cd ${ISAACLAB_PATH} && ./isaaclab.sh --install
 # ── 6. Copy only dependency sources needed for compilation ───────────────────
 COPY third_party/TacEx/source ${ISAACLAB_EXTENSION_TEMPLATE_PATH}/third_party/TacEx/source
 COPY curobo ${ISAACLAB_EXTENSION_TEMPLATE_PATH}/curobo
@@ -76,8 +82,18 @@ RUN /isaac-sim/python.sh -m pip install -e \
     /isaac-sim/python.sh -m pip install -e \
     ${ISAACLAB_EXTENSION_TEMPLATE_PATH}/third_party/TacEx/source/tacex_uipc -v
 
+# ── 7b. Preserve libuipc runtime .so files outside the mounted volume ─────────
+# The cmake build above writes libuipc*.so into the tacex_uipc source tree, which
+# is bind-mounted at runtime and would therefore shadow the image-layer artifacts.
+# Copy them to /opt/uipc_libs (not mounted) so they are always reachable.
+RUN mkdir -p /opt/uipc_libs && \
+    find ${ISAACLAB_EXTENSION_TEMPLATE_PATH}/third_party/TacEx/source/tacex_uipc \
+         -name "libuipc*.so*" -exec cp -P {} /opt/uipc_libs/ \;
+ENV LD_LIBRARY_PATH=/opt/uipc_libs:${LD_LIBRARY_PATH}
+
 # ── 8. curobo (slow compile) ──────────────────────────────────────────────────
-RUN /isaac-sim/python.sh -m pip install \
+RUN /isaac-sim/python.sh -m pip install wheel setuptools && \
+    /isaac-sim/python.sh -m pip install \
     ${ISAACLAB_EXTENSION_TEMPLATE_PATH}/curobo \
     --no-build-isolation && \
     /isaac-sim/python.sh -m pip install transforms3d

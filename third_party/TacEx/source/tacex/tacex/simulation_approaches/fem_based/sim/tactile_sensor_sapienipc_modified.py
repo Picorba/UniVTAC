@@ -14,21 +14,16 @@
 ##
 
 import cv2
-import time
 import math
 import numpy as np
 import torch
 
-import usdrt
-import usdrt.UsdGeom
 from sklearn.neighbors import NearestNeighbors
 
 import isaaclab.utils.math as math_utils
 
 from tacex_uipc.objects import UipcObject
 from tacex_uipc.sim import UipcSim
-
-from .utils.geometry import in_hull
 
 try:
     from isaacsim.util.debug_draw import _debug_draw
@@ -319,26 +314,33 @@ class VisionTactileSensorUIPC:
             self.reference_surface_vertices_camera[self.marker_surf_idx].cpu().numpy()
             * self.marker_weight[..., None]
         ).sum(1)
+        #print("shape0",init_marker_pts)
         curr_marker_pts = (
             self.get_surface_vertices_camera()[self.marker_surf_idx].cpu().numpy()
             * self.marker_weight[..., None]
         ).sum(1)
-
         mean_motion = np.mean(
             self.get_vertices_camera()[self.constrain_ids].cpu().numpy() - self.constrain_pts, axis=0)
         curr_marker_pts[:, :2] -= mean_motion[:2]
-
+        #print("shape1",curr_marker_pts)
         init_marker_uv = self.gen_marker_uv(init_marker_pts)
+        #print("INIT UV",init_marker_uv)
         curr_marker_uv = self.gen_marker_uv(curr_marker_pts)
+        #print("INIT UV",curr_marker_uv)
         marker_mask = np.logical_and.reduce([
             curr_marker_uv[:, 0] > 0,
             curr_marker_uv[:, 0] < self.tactile_img_width,
             curr_marker_uv[:, 1] > 0,
             curr_marker_uv[:, 1] < self.tactile_img_height,
         ])
+        #print("marker_mask",marker_mask)
         marker_flow = np.stack([init_marker_uv, curr_marker_uv], axis=0)
         marker_flow = marker_flow[:, marker_mask]
-
+        #print("MARKER FLOW",marker_flow)
+        #print("/"*80,marker_flow.shape)
+        """print(marker_flow[:,0,0])
+        print(marker_flow[0,:,0])
+        print(marker_flow[0,0,:])"""
         # post processing
         no_lose_tracking_mask = np.random.rand(marker_flow.shape[1]) > self.marker_lose_tracking_probability
         marker_flow = marker_flow[:, no_lose_tracking_mask, :]
@@ -346,7 +348,8 @@ class VisionTactileSensorUIPC:
         marker_flow += noise
 
         original_point_num = marker_flow.shape[1]
-
+        #print("original_point_num", original_point_num)
+        #print("self.num_markers",self.num_markers)
         if original_point_num >= self.num_markers:
             chosen = np.random.choice(original_point_num, self.num_markers, replace=False)
             ret = marker_flow[:, chosen, ...]
@@ -362,6 +365,7 @@ class VisionTactileSensorUIPC:
 
         ret = torch.tensor(ret, device="cuda:0")
         self.curr_marker_uv = curr_marker_uv
+        #print("RET", ret)
         return ret
 
     def get_marker_img(self):

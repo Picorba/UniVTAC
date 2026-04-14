@@ -37,7 +37,7 @@ class Task(BaseTask):
         # RigidActor with contact sensing enabled — no UIPC FEM, but PhysX ContactSensor works.
         self.cylinder = self._actor_manager.add_rigid_from_usd_file(
             name='cylinder',
-            asset_path='Bar_Cylinder.usd',
+            asset_path='oscar.usd',
             pose=CYLINDER_BASE_POSE,
             density=self.cfg.DENSITY,
             activate_contact_sensors=True,

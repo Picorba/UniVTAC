@@ -30,9 +30,6 @@ services:
     - type: bind
       source: ../
       target: ${ISAACLAB_EXTENSION_TEMPLATE_PATH}
-    - type: bind
-      source: ../../Benchmark
-      target: ${ISAACLAB_EXTENSION_TEMPLATE_PATH}
 
     network_mode: host # none
     environment: *default-isaac-lab-template-environment

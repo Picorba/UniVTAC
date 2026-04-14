@@ -216,6 +216,8 @@ class HDF5Handler:
             if isinstance(v, dict):
                 subgroup = node.create_group(k)
                 self.dict_to_hdf5(subgroup, v)
+            elif isinstance(v, str):
+                node.create_dataset(k, data=np.bytes_(v))
             elif isinstance(v, (list, np.ndarray)):
                 if "rgb" in k and encode_images:
                     v = np.array(v)
@@ -223,6 +225,7 @@ class HDF5Handler:
                     node.create_dataset(k, data=encode_data, dtype=f"S{max_len}")
                 elif len(v) > 0 and isinstance(v[0], str):
                     max_len = np.max([len(s) for s in v])
+                    max_len = max(max_len, 1)
                     node.create_dataset(k, data=v, dtype=f'S{max_len}')
                 else:
                     v = np.array(v)

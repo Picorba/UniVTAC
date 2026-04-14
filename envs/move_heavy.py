@@ -2,7 +2,7 @@ from ._base_task import *
 import os
 import numpy as np
 
-OSCAR_BASE_POSE = Pose([0.55, 0.0, 0.03], [1, 0, 0, 0])
+OSCAR_BASE_POSE = Pose([0.55, 0.0, 0.1], [1, 0, 0, 0])
 
 
 @configclass
@@ -82,7 +82,7 @@ class Task(BaseTask):
         )
 
     def _play_once(self):
-        self.move(self.atom.close_gripper(force=10, steps=50))
+        self.move(self.atom.close_gripper(force=50, steps=50))
         self._print_effort("after default close")
 
         self.origin_inhand_pose = self.oscar.get_pose().rebase(self.atom.get_arm_pose())
@@ -96,7 +96,7 @@ class Task(BaseTask):
         self.delay(30, is_save=True)
 
         print("[_play_once] opening gripper to release...")
-        self.move(self.atom.open_gripper(force=10, steps=50))
+        self.move(self.atom.open_gripper(force=50, steps=50))
         self._print_effort("after open")
 
         self.move(self.atom.move_by_displacement(z=-0.05), time_dilation_factor=0.5)

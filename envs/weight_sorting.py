@@ -1,119 +1,195 @@
 from ._base_task import *
 import numpy as np
 
-# Three visually identical cylinders (Bar_Cylinder.usd) with different densities.
-# The robot lifts each, uses gripper effort as a mass proxy, ranks them,
-# then places them left-to-right in ascending mass order.
+# N visually identical cuboids (Bar_Cuboid.usd, AffineBody) with different densities.
+# Phase 1 – weigh every cube: grasp → lift → hold → read gripper effort → return.
+# Phase 2 – place in ascending mass order into numbered bins (pad 0 = lightest).
 
-_MASSES_G = [100, 300, 600]          # grams — easy to distinguish by force
-_CYL_VOLUME = np.pi * 0.02**2 * 0.10  # Bar_Cylinder approx: r=2cm h=10cm
-_DENSITIES = [m * 1e-3 / _CYL_VOLUME for m in _MASSES_G]
+_N_DEFAULT = 4
 
-# Starting positions: three cylinders in a row along y
-_CYL_X = 0.55
-_CYL_Z = 0.02
-_CYL_Y = [-0.15, 0.0, 0.15]
+# Densities span a 15× range so effort differences are clearly tactile.
+_DENSITY_MIN =  100.0   # kg/m³  (lightest)
+_DENSITY_MAX = 1500.0   # kg/m³  (heaviest)
 
-# Destination pads: shifted toward robot along x
-_PAD_X = 0.40
-_PAD_Y = [-0.15, 0.0, 0.15]
+# Bar_Cuboid geometry (from USD): 3 cm × 1.5 cm × 12 cm, local origin at bottom.
+# Grasp wings protrude in Y (±1.5 cm) at local z = 0.095–0.105, centred at 0.10.
+_CUBE_SPAWN_Z  = 0.001  # place bar bottom just above the table surface
 
-_LIFT_Z = 0.18
-_HOLD_STEPS = 25  # sim steps to hold at lift height before reading effort
+# Starting row: cubes lined up along Y at fixed X
+_START_X       = 0.55
+_START_Z       = _CUBE_SPAWN_Z
+_START_SPACING = 0.13    # centre-to-centre gap (m)
+
+# Destination pads: parallel row, shifted toward the robot
+_PAD_X       = 0.40
+_PAD_SPACING = 0.13
+_PAD_Z       = 0.005
+
+# Grasp motion
+# _APPROACH_Z: height offset from bar bottom to hover at before descending (> 0.12 to clear the top)
+# _GRASP_Z:    height offset from bar bottom to the wing centre (= 0.10)
+_APPROACH_Z   = 0.18   # world z = bar_bottom + 0.18 → 6 cm above bar top
+_GRASP_Z      = 0.09   # world z = bar_bottom + 0.09 → bottom edge of grasp wings (0.095–0.105)
+
+# Weighing motion
+_WEIGH_LIFT_Z = 0.18
+_WEIGH_HOLD   = 25   # sim steps held at lift height before reading effort
+
+# Clearance lift before any horizontal transport (must clear bar top at 0.12 m + neighbours)
+_TRANSPORT_LIFT_Z = 0.20   # lift from grasp point before moving to pad
+
+
+def _centred_y(n: int, spacing: float) -> list[float]:
+    """Return n y-positions centred on 0 with the given spacing."""
+    half = (n - 1) / 2.0
+    return [spacing * (i - half) for i in range(n)]
 
 
 @configclass
 class TaskCfg(BaseTaskCfg):
-    step_lim: int = 2000
-    use_force_grasp: bool = True
-    grasp_force: float = 12.0
+    step_lim: int    = 4000
+    n_cubes:  int    = _N_DEFAULT
+    use_force_grasp:     bool  = True
+    grasp_force:         float = 12.0   # gentle force when closing onto the object
+    fast_gripper_force:  float = 50.0   # high force for fast open / fast release
 
 
 class Task(BaseTask):
 
     def create_actors(self):
-        self._cylinders: list[Actor] = []
-        for i, density in enumerate(_DENSITIES):
-            cyl = self._actor_manager.add_from_usd_file(
-                name=f'cylinder_{i}',
-                asset_path='Bar_Cylinder.usd',
-                pose=Pose([_CYL_X, _CYL_Y[i], _CYL_Z], [1, 0, 0, 0]),
-                density=density,
-            )
-            self._cylinders.append(cyl)
+        n = self.cfg.n_cubes
+        # Canonical density ranks: index 0 = lightest, index n-1 = heaviest
+        self._densities: np.ndarray = np.linspace(_DENSITY_MIN, _DENSITY_MAX, n)
 
+        start_ys = _centred_y(n, _START_SPACING)
+        self._cubes: list[Actor] = []
+        for i, density in enumerate(self._densities):
+            cube = self._actor_manager.add_from_usd_file(
+                name=f'cube_{i}',
+                asset_path='Bar_Cuboid.usd',
+                pose=Pose([_START_X, start_ys[i], _START_Z], [1, 0, 0, 0]),
+                density=float(density),
+            )
+            self._cubes.append(cube)
+
+        # Destination pads – fixed positions, pad index == weight rank
+        pad_ys = _centred_y(n, _PAD_SPACING)
         self._pads: list[Actor] = []
-        for i in range(3):
+        for i in range(n):
             pad = self._actor_manager.add_from_usd_file(
                 name=f'pad_{i}',
                 asset_path='GreenPad.usd',
-                pose=Pose([_PAD_X, _PAD_Y[i], 0.005], [1, 0, 0, 0]),
+                pose=Pose([_PAD_X, pad_ys[i], _PAD_Z], [1, 0, 0, 0]),
                 density=1e5,
             )
             self._pads.append(pad)
 
     def _reset_actors(self):
-        # Shuffle which density goes to which starting slot
-        perm = self.rng.permutation(3)
-        self._density_perm = perm  # perm[slot] = density_index
-        for slot, density_idx in enumerate(perm):
-            self._cylinders[slot].set_pose(
-                Pose([_CYL_X, _CYL_Y[slot], _CYL_Z], [1, 0, 0, 0])
-            )
-        self._recorded_efforts = [None, None, None]
-        self._placed_order = []   # slot indices in the order placed (ascending effort)
-        self._success_steps = 0
+        n = self.cfg.n_cubes
+        # Assign a random permutation of density indices to starting slots
+        perm = self.rng.permutation(n)   # perm[slot] = density_index
+        self._density_perm = perm
 
-    # ------------------------------------------------------------------
+        start_ys = _centred_y(n, _START_SPACING)
+        for slot, density_idx in enumerate(perm):
+            noise = self.create_noise([0.005, 0.005, 0.0], [0, 0, np.pi / 18])
+            pose  = Pose([_START_X, start_ys[slot], _START_Z], [1, 0, 0, 0]).add_offset(noise)
+            self._cubes[slot].set_pose(pose)
+
+        self._weighed_efforts: list[float | None] = [None] * n
+        self._placed_order:    list[int]           = []
+        self._success_steps:   int                 = 0
+
+    # ── Episode logic ─────────────────────────────────────────────────────────
+
+    def _top_down_grasp(self, cube: Actor):
+        """Open gripper, approach top-down, descend to wing height, close.
+
+        Uses grasp_actor with pre_dis so cuRobo plans the full above→descend
+        motion as a single two-waypoint problem — avoids the S-curve artefact
+        that appears when move_to_pose/move_by_displacement are chained separately.
+
+        Contact point is registered at the wing centre (local z = _GRASP_Z) with
+        top-down orientation, so get_grasp_pose raises it by pre_dis to the
+        approach height automatically.
+        """
+        # Place contact point at wing height with top-down orientation
+        cube_p = cube.get_pose().p
+        grasp_p = cube_p + np.array([0, 0, _GRASP_Z])
+        contact_pose = construct_grasp_pose(
+            grasp_p, np.array([0, 0, 1]), np.array([1, 0, 0])
+        )
+        cube.cfg.contact_points.clear()
+        contact_idx = cube.register_point(pose=contact_pose, type='contact')
+
+        # pre_dis lifts the pre-grasp waypoint to _APPROACH_Z above the bar bottom
+        pre_dis = _APPROACH_Z - _GRASP_Z   # 0.18 - 0.09 = 0.09 m
+
+
+        # grasp_actor passes pre_dis to plan_arm → cuRobo sees both waypoints and
+        # plans a clean straight descent rather than a freeform arc
+        self.move(self.atom.grasp_actor(
+            cube,
+            contact_point_id=contact_idx,
+            pre_dis=pre_dis,
+            dis=0,
+            is_close=False,
+        ))
+
+        # Close to pos=0.0 with explicit force; stops when position reached or stable
+        self.move(self.atom.close_gripper(pos=0.0, force=self.cfg.grasp_force))
 
     def pre_move(self):
-        self.delay(10)
+        self.delay(1)
 
     def _play_once(self):
-        n = 3
+        n = self.cfg.n_cubes
 
-        # Phase 1: weigh each cylinder
-        print('[weight_sorting] Phase 1: weighing')
+        # ── Phase 1: weigh each cube ──────────────────────────────────────────
+        print(f'[weight_sorting] Phase 1 – weighing {n} cubes')
         for slot in range(n):
-            cyl = self._cylinders[slot]
-            cyl.cfg.contact_points.clear()
-            contact_idx = cyl.register_point(pose=cyl.get_pose(), type='contact')
-            self.move(self.atom.grasp_actor(cyl, contact_point_id=contact_idx, is_close=False))
-            self.move(self.atom.close_gripper())
-            self.move(self.atom.move_by_displacement(z=_LIFT_Z))
-            self.delay(_HOLD_STEPS, is_save=True)
+            cube = self._cubes[slot]
+            self._top_down_grasp(cube)
+
+            self.move(self.atom.move_by_displacement(z=_WEIGH_LIFT_Z))
+            self.delay(_WEIGH_HOLD, is_save=True)
 
             effort = self._robot_manager.get_gripper_effort()
-            proxy = (abs(effort[0].item()) + abs(effort[1].item())) / 2.0
-            self._recorded_efforts[slot] = proxy
-            print(f'  slot {slot}: effort_proxy={proxy:.2f} N'
-                  f'  (true_density={_DENSITIES[self._density_perm[slot]]:.0f} kg/m³)')
+            proxy  = (abs(effort[0].item()) + abs(effort[1].item())) / 2.0
+            self._weighed_efforts[slot] = proxy
 
-            self.move(self.atom.move_by_displacement(z=-_LIFT_Z))
-            self.move(self.atom.open_gripper())
-            self.delay(15)
+            true_density = self._densities[self._density_perm[slot]]
+            print(f'  slot {slot}: effort_proxy={proxy:.3f} N  '
+                  f'density={true_density:.0f} kg/m³')
 
-        # Phase 2: place in ascending effort order
-        print('[weight_sorting] Phase 2: placing')
-        ranked_slots = sorted(range(n), key=lambda s: self._recorded_efforts[s])
+            self.move(self.atom.move_by_displacement(z=-_WEIGH_LIFT_Z))
+            self.move(self.atom.open_gripper(pos=1.0, force=self.cfg.fast_gripper_force))
+            self.delay(20)
+
+        # ── Phase 2: place light → heavy ──────────────────────────────────────
+        print('[weight_sorting] Phase 2 – sorting')
+        ranked_slots = sorted(range(n), key=lambda s: self._weighed_efforts[s])
         for dest_idx, slot in enumerate(ranked_slots):
-            cyl = self._cylinders[slot]
-            cyl.cfg.contact_points.clear()
-            contact_idx = cyl.register_point(pose=cyl.get_pose(), type='contact')
-            self.move(self.atom.grasp_actor(cyl, contact_point_id=contact_idx, is_close=False))
-            self.move(self.atom.close_gripper())
-            self.move(self.atom.place_actor(cyl, self._pads[dest_idx].get_pose(), is_open=True))
+            cube = self._cubes[slot]
+            self._top_down_grasp(cube)
+
+            # Lift clear of all neighbouring bars before moving horizontally
+            self.move(self.atom.move_by_displacement(z=_TRANSPORT_LIFT_Z))
+            self.move(self.atom.place_actor(cube, self._pads[dest_idx].get_pose(), is_open=True))
             self._placed_order.append(slot)
-            print(f'  placed slot {slot} → pad {dest_idx}')
+            print(f'  slot {slot} → pad {dest_idx}')
+
+    # ── Success criterion ──────────────────────────────────────────────────────
 
     def check_success(self) -> bool:
-        if len(self._placed_order) < 3:
+        n = self.cfg.n_cubes
+        if len(self._placed_order) < n:
             return False
-        # True ascending order by density index
-        true_rank = sorted(range(3), key=lambda s: _DENSITIES[self._density_perm[s]])
-        correct = sum(p == t for p, t in zip(self._placed_order, true_rank))
-        rank_acc = correct / 3
-        success = rank_acc >= 1.0
+        # Ground-truth ascending rank sorted by actual density
+        true_rank = sorted(range(n), key=lambda s: self._densities[self._density_perm[s]])
+        correct   = sum(p == t for p, t in zip(self._placed_order, true_rank))
+        rank_acc  = correct / n
+        success   = rank_acc >= 1.0
         print(f'[weight_sorting] rank_accuracy={rank_acc:.2f}  success={success}')
         self._success_steps = (self._success_steps + 1) if success else 0
         return success

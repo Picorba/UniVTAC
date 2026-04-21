@@ -903,6 +903,7 @@ class BaseTask(UipcRLEnv):
             if len(pos_history) > stable_window:
                 pos_history.pop(0)
                 if max(pos_history) - min(pos_history) < stable_tol:
+                    print("NNNNNNOOOOOOOOOOOOo")
                     break
             yield target_force, True
         yield target_force, False

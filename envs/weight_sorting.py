@@ -32,8 +32,8 @@ _APPROACH_Z   = 0.18   # world z = bar_bottom + 0.18 → 6 cm above bar top
 _GRASP_Z      = 0.09   # world z = bar_bottom + 0.09 → bottom edge of grasp wings (0.095–0.105)
 
 # Weighing motion
-_WEIGH_LIFT_Z = 0.18
-_WEIGH_HOLD   = 25   # sim steps held at lift height before reading effort
+_WEIGH_LIFT_Z = 0.15
+_WEIGH_HOLD   = 1   # sim steps held at lift height before reading effort
 
 # Clearance lift before any horizontal transport (must clear bar top at 0.12 m + neighbours)
 _TRANSPORT_LIFT_Z = 0.20   # lift from grasp point before moving to pad
@@ -50,13 +50,15 @@ class TaskCfg(BaseTaskCfg):
     step_lim: int    = 4000
     n_cubes:  int    = _N_DEFAULT
     use_force_grasp:     bool  = True
-    grasp_force:         float = 12.0   # gentle force when closing onto the object
-    fast_gripper_force:  float = 50.0   # high force for fast open / fast release
 
+    grasp_force_soft: float  = 12
+    grasp_force_normal: float = 30.0  
+    grasp_force_strong:  float = 50.0
 
 class Task(BaseTask):
 
     def create_actors(self):
+        self.done = False
         n = self.cfg.n_cubes
         # Canonical density ranks: index 0 = lightest, index n-1 = heaviest
         self._densities: np.ndarray = np.linspace(_DENSITY_MIN, _DENSITY_MAX, n)
@@ -66,7 +68,7 @@ class Task(BaseTask):
         for i, density in enumerate(self._densities):
             cube = self._actor_manager.add_from_usd_file(
                 name=f'cube_{i}',
-                asset_path='Bar_Cuboid.usd',
+                asset_path='Bar_Cylinder.usd',
                 pose=Pose([_START_X, start_ys[i], _START_Z], [1, 0, 0, 0]),
                 density=float(density),
             )
@@ -125,7 +127,6 @@ class Task(BaseTask):
         # pre_dis lifts the pre-grasp waypoint to _APPROACH_Z above the bar bottom
         pre_dis = _APPROACH_Z - _GRASP_Z   # 0.18 - 0.09 = 0.09 m
 
-
         # grasp_actor passes pre_dis to plan_arm → cuRobo sees both waypoints and
         # plans a clean straight descent rather than a freeform arc
         self.move(self.atom.grasp_actor(
@@ -136,8 +137,7 @@ class Task(BaseTask):
             is_close=False,
         ))
 
-        # Close to pos=0.0 with explicit force; stops when position reached or stable
-        self.move(self.atom.close_gripper(pos=0.0, force=self.cfg.grasp_force))
+        self.move(self.atom.close_gripper(pos=0.35  , force=self.cfg.grasp_force_normal))
 
     def pre_move(self):
         self.delay(1)
@@ -163,8 +163,8 @@ class Task(BaseTask):
                   f'density={true_density:.0f} kg/m³')
 
             self.move(self.atom.move_by_displacement(z=-_WEIGH_LIFT_Z))
-            self.move(self.atom.open_gripper(pos=1.0, force=self.cfg.fast_gripper_force))
-            self.delay(20)
+            self.move(self.atom.open_gripper(pos=1.0, force=self.cfg.grasp_force_strong))
+            self.move(self.atom.move_by_displacement(z=_WEIGH_LIFT_Z))
 
         # ── Phase 2: place light → heavy ──────────────────────────────────────
         print('[weight_sorting] Phase 2 – sorting')
@@ -178,10 +178,12 @@ class Task(BaseTask):
             self.move(self.atom.place_actor(cube, self._pads[dest_idx].get_pose(), is_open=True))
             self._placed_order.append(slot)
             print(f'  slot {slot} → pad {dest_idx}')
-
+        self.done = True
     # ── Success criterion ──────────────────────────────────────────────────────
 
     def check_success(self) -> bool:
+        if not self.done :
+            return 
         n = self.cfg.n_cubes
         if len(self._placed_order) < n:
             return False

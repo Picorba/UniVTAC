@@ -225,6 +225,8 @@ class BaseTask(UipcRLEnv):
         self.eval_success = False
         self.in_pre_move = False
         self._gripper_grasping = False
+        self._gripper_grasping_force: float = 0.0  # last force used; maintained during arm-only moves
+        self._gripper_hold_qpos: float = 0.0       # qpos to hold after force grasp ends
         self.last_qpos = None
         self.keep_still_times = 0
         self.atom_tag = ''
@@ -304,7 +306,6 @@ class BaseTask(UipcRLEnv):
         self.atom:Atom = Atom(self)
 
         self.plate = RigidObject(self.cfg.plate)
-
         # add lights
         self.cfg.light.spawn.func(self.cfg.light.prim_path, self.cfg.light.spawn)
     
@@ -474,6 +475,8 @@ class BaseTask(UipcRLEnv):
         self.plan_success = True
         self.eval_success = False
         self._gripper_grasping = False
+        self._gripper_grasping_force = 0.0
+        self._gripper_hold_qpos = 0.0
         self.step_count = 0
         self.save_count = 0
         self.step_cost = np.zeros(20)
@@ -622,6 +625,11 @@ class BaseTask(UipcRLEnv):
             'total_cost': total_cost
         }
         self.log = self._step_callback(status_dict)
+        """if hasattr(self, '_shapes') and 'star' in self._shapes:
+            star_p = self._shapes['star'].get_pose().p
+            self.log += f' | star={np.round(star_p, 3)}'"""
+        grip_eff = self._robot_manager.get_gripper_effort()
+        self.log += f' | grip_eff: [{grip_eff[0].item():+.3f}, {grip_eff[1].item():+.3f}] N'
         print(self.log+' '*5, end='\r')
     
     def _play_once(self):
@@ -775,7 +783,10 @@ class BaseTask(UipcRLEnv):
                             'status': 'success',
                             'num_steps': -1,
                             'target': target_pos,
-                            'threshold': action.args.get('gripper_depth_threshold', gripper_depth_threshold)
+                            'threshold': action.args.get('gripper_depth_threshold', gripper_depth_threshold),
+                            'extra_steps': action.args.get('gripper_extra_steps', 0),
+                            'squeeze_force': action.args.get('gripper_squeeze_force'),
+                            'squeeze_steps': action.args.get('gripper_squeeze_steps', 20),
                         }
                     else:
                         control_seq['gripper'] = self._robot_manager.plan_gripper(
@@ -806,7 +817,7 @@ class BaseTask(UipcRLEnv):
             self._step(is_save)
         self._update_render()
         return True
- 
+
     def take_dense_action(self, control_seq, is_save:bool=True):
         """
         control_seq:
@@ -819,11 +830,11 @@ class BaseTask(UipcRLEnv):
 
         arm_steps = arm_seq['num_steps'] if arm_seq is not None else 0
         gripper_steps = gripper_seq['num_steps'] if gripper_seq is not None else 0
-
         if gripper_steps == -1: # adaptive grasp
             idx, gripper_active = 0, True
             gripper_planner = self.adaptive_set_gripper(
-                gripper_seq['target'], gripper_seq['threshold'])
+                gripper_seq['target'], gripper_seq['threshold'],
+                extra_steps=gripper_seq.get('extra_steps', 0))
             while True:
                 if idx >= arm_steps and not gripper_active:
                     break
@@ -837,6 +848,17 @@ class BaseTask(UipcRLEnv):
                     self._robot_manager.set_gripper(pos, vel)
                 self._step(is_save)
                 idx += 1
+            # Post-contact force squeeze: apply a fixed force for N steps to
+            # ensure the fingers are firmly seated against the object.
+            squeeze_force = gripper_seq.get('squeeze_force')
+            if squeeze_force is not None:
+                squeeze_steps = gripper_seq.get('squeeze_steps', 20)
+                for target_force, _ in self.force_control_gripper(
+                        squeeze_force, steps=squeeze_steps):
+                    self._robot_manager.set_gripper_effort(target_force)
+                    self._step(is_save)
+                self._gripper_grasping = True
+                self._gripper_hold_qpos = self._robot_manager.get_gripper_qpos()
         elif gripper_steps == -2:  # force control
             idx, gripper_active = 0, True
             gripper_planner = self.force_control_gripper(
@@ -861,6 +883,8 @@ class BaseTask(UipcRLEnv):
                 self._step(is_save)
                 idx += 1
             self._gripper_grasping = True
+            self._gripper_grasping_force = gripper_seq['target_force']
+            self._gripper_hold_qpos = self._robot_manager.get_gripper_qpos()
         else:
             max_control_len = max(arm_steps, gripper_steps)
             for idx in range(max_control_len):
@@ -869,11 +893,20 @@ class BaseTask(UipcRLEnv):
                         arm_seq['position'][idx],
                         arm_seq['velocity'][idx]
                     )
-                if gripper_steps is not None and idx < gripper_steps:
+                if gripper_steps > 0 and idx < gripper_steps:
                     self._robot_manager.set_gripper(
                         gripper_seq['position'][idx],
                         gripper_seq['velocity'][idx]
                     )
+                elif self._gripper_grasping:
+                    # Hold the gripper at its post-grasp position using PD control.
+                    # Re-applying force here conflicts with set_arm(force=True) which
+                    # writes set_dof_positions for all joints, causing physics instability.
+                    hold = torch.tensor(
+                        [self._gripper_hold_qpos, self._gripper_hold_qpos],
+                        device=self._robot_manager.device,
+                    )
+                    self._robot_manager.set_gripper(hold, torch.zeros_like(hold), force=False)
                 self._step(is_save)
         return True
 
@@ -929,7 +962,7 @@ class BaseTask(UipcRLEnv):
 
     def force_control_gripper(self, target_force: float, target_pos: float = None,
                               steps: int | Literal['auto'] = 'auto',
-                              max_steps: int = 300, stable_window: int = 20, stable_tol: float = 1e-5):
+                              max_steps: int = 300, stable_window: int = 5, stable_tol: float = 1e-5):
         """Generator that applies a gripping force, optionally stopping at a target position.
 
         Yields ``(target_force, active)`` each step.
@@ -947,7 +980,6 @@ class BaseTask(UipcRLEnv):
         """
         target_qpos = (self._robot_manager.gripper_percent2qpos(target_pos)
                        if target_pos is not None else None)
-
         def _target_reached():
             if target_qpos is None:
                 return False
@@ -973,12 +1005,31 @@ class BaseTask(UipcRLEnv):
             pos_history.append(self._robot_manager.get_gripper_qpos())
             if len(pos_history) > stable_window:
                 pos_history.pop(0)
-                if max(pos_history) - min(pos_history) < stable_tol:
+                print("MAX DELTA FINGER",max(pos_history) - min(pos_history))
+                if (max(pos_history) - min(pos_history)) < stable_tol:
                     break
             yield target_force, True
         yield target_force, False
 
-    def adaptive_set_gripper(self, qpos, depth_threshold:float=None):
+    def adaptive_set_gripper(self, qpos, depth_threshold:float=None, extra_steps:int=0):
+        """Generator that closes/opens the gripper adaptively using tactile depth.
+
+        After contact is detected (all tactile depths < ``depth_threshold``), the
+        gripper continues closing for ``extra_steps`` additional steps at
+        ``contact_step`` resolution before stopping.  This prevents the gripper
+        from under-gripping while avoiding the over-closing that pure
+        position/force control causes on deformable objects.
+
+        Args:
+            qpos: Target joint position (metres).  Acts as a hard lower bound on
+                  closing so the fingers never go below this value.
+            depth_threshold: Tactile depth (mm) below which contact is considered
+                established.  None disables contact-based stopping.
+            extra_steps: Number of additional closing steps to execute after
+                contact is first detected.  Each step closes by ``contact_step``
+                (0.05 mm) clamped to ``qpos``.  Default 0 preserves original
+                behaviour.
+        """
         max_steps = 1000
         default_step, contact_step = 0.0005, 0.00005
         last_qpos = self._robot_manager.get_gripper_qpos()
@@ -998,6 +1049,15 @@ class BaseTask(UipcRLEnv):
                     step_size = -default_step
                 elif depth_threshold is not None:
                     if torch.all(tactile_depth < depth_threshold):
+                        # Contact detected — apply gentle extra closing steps before stopping.
+                        for _ in range(extra_steps):
+                            current_qpos = self._robot_manager.get_gripper_qpos()
+                            extra_target = max(current_qpos - contact_step, qpos)
+                            position = torch.tensor(
+                                [extra_target, extra_target], device=self._robot_manager.device)
+                            velocity = (position - current_qpos) / self.cfg.sim.dt
+                            last_qpos = current_qpos
+                            yield position, velocity, True
                         break
                     else:
                         step_size = - min(

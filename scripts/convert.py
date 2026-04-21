@@ -431,7 +431,6 @@ class MeshConverter(AssetConverterBase):
         enable_extension("omni.kit.asset_converter")
 
         import omni.kit.asset_converter
-        import omni.usd
 
         converter_context = omni.kit.asset_converter.AssetConverterContext()
         converter_context.ignore_materials = not load_materials

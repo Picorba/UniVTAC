@@ -305,7 +305,9 @@ class Atom:
         return [Action("move", target_pose=target_pose)]
     
     def close_gripper(self, pos: float = 0.0, depth_threshold:Literal['auto']|float='auto',
-                      force: float = None, steps: int | Literal['auto'] = 'auto'):
+                      force: float = None, steps: int | Literal['auto'] = 'auto',
+                      extra_steps: int = 0,
+                      squeeze_force: float = None, squeeze_steps: int = 20):
         """Close the gripper.
 
         Args:
@@ -316,6 +318,11 @@ class Atom:
             steps: Number of simulation steps to apply the force.  'auto' keeps the current
                    behaviour of stopping once the gripper position stabilises.  Has no effect
                    when ``use_force_grasp`` is False.
+            extra_steps: Number of additional gentle position-closing steps after contact
+                         is detected (adaptive grasp mode only).  Each step closes ~0.05 mm.
+            squeeze_force: Force in Newtons to apply after adaptive contact detection to
+                           ensure a firm grip.  None disables the squeeze.
+            squeeze_steps: Number of steps to hold ``squeeze_force`` (default 20).
         """
         if depth_threshold == 'auto':
             if self.task.cfg.use_adaptive_grasp:
@@ -324,9 +331,10 @@ class Atom:
                 depth_threshold = None
         return [Action("close", target_gripper_pos=pos,
                        gripper_depth_threshold=depth_threshold, gripper_force=force,
-                       gripper_force_steps=steps)]
+                       gripper_force_steps=steps, gripper_extra_steps=extra_steps,
+                       gripper_squeeze_force=squeeze_force, gripper_squeeze_steps=squeeze_steps)]
 
-    def open_gripper(self, pos: float = 1.0, depth_threshold: float = None, force: float = None,
+    def open_gripper(self, pos: float = None, depth_threshold: float = None, force: float = None,
                      steps: int | Literal['auto'] = 'auto'):
         """Open the gripper.
 
@@ -343,7 +351,32 @@ class Atom:
         return [Action("open", target_gripper_pos=pos,
                        gripper_depth_threshold=depth_threshold, gripper_force=-force if force is not None else None,
                        gripper_force_steps=steps)]
+                       
+    def rotate_wrist_z(self, theta: float):
+        """
+        Rotate EE by theta around world Z, position held exactly.
+        q_new = q_worldZ(theta) ⊗ q_current  (left multiply = world frame rotation)
+        """
+        ee_now = self.robot.get_ee_pose()
+        w, x, y, z = float(ee_now.q[0]), float(ee_now.q[1]), \
+                    float(ee_now.q[2]), float(ee_now.q[3])
 
+        # Pure Z rotation quaternion
+        half = theta / 2.0
+        rw, rx, ry, rz = np.cos(half), 0.0, 0.0, np.sin(half)
+
+        # Full quaternion product: q_new = q_rot ⊗ q_current
+        new_w = rw*w - rx*x - ry*y - rz*z
+        new_x = rw*x + rx*w + ry*z - rz*y
+        new_y = rw*y - rx*z + ry*w + rz*x
+        new_z = rw*z + rx*y - ry*x + rz*w
+
+        target_pose = Pose(
+            p=ee_now.p.copy(),   # exact same position
+            q=np.array([new_w, new_x, new_y, new_z]),
+        )
+        return [Action("move", target_pose=target_pose)]
+    
     def back_to_origin(self):
         return [Action("move", target_pose=self.robot.origin_pose)]
 

@@ -136,11 +136,11 @@ class Actor(UipcObject):
     def set_pose(self, pose:Pose):
         mat = torch.tensor(
             pose.to_transformation_matrix() @ np.linalg.inv(self.init_pose.to_transformation_matrix()), dtype=torch.float64, device=self._device)
- 
+
         self.next_pts = (self.init_vertex_pos @ mat[:3, :3].T + mat[:3, 3]).cpu().numpy()
         self.next_mat = mat.cpu().numpy()
         self.next_status = 'set'
-    
+
     def remove_animate(self):
         self.next_status = 'unset'
 
@@ -313,7 +313,19 @@ class RigidActor:
         self._rigid_object.write_root_velocity_to_sim(root_vel)
 
     def remove_animate(self):
-        pass  # no animation constraints for rigid bodies
+        pass
+
+    def freeze(self):
+        """No-op for PhysX rigid bodies.
+
+        Off-screen RigidActors (teleported to [10,10,0] with zero velocity) have
+        negligible PhysX solver cost.  Provided for API symmetry with Actor.
+        """
+        pass
+
+    def unfreeze(self):
+        """No-op for PhysX rigid bodies — dynamics resume automatically."""
+        pass
 
     def update(self, dt: float):
         self._rigid_object.update(dt)

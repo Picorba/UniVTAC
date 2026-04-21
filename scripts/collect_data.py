@@ -87,7 +87,7 @@ task_config, task_config_file = get_config(
     default_root=Path(__file__).parent.parent / 'task_config', 
     type='yaml'
 )
-
+print(task_config)
 if task_config.get('render_frequency', 1) == 0:
     args_cli.livestream = 0
 

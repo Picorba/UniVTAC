@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=univtac
-#SBATCH --time=01:00:00
+#SBATCH --time=02:00:00
 #SBATCH --partition=gpu_p6
 #SBATCH --qos=qos_gpu_h100-dev
 #SBATCH --output=/lustre/fsn1/projects/rech/wac/usf98cb/logs/univtac/%x_%j.out
@@ -67,7 +67,7 @@ srun singularity exec --nv \
       export TORCH_USE_CUDA_DSA=1 && \
       /isaac-sim/python.sh \
       /workspace/tacex/scripts/collect_data.py \
-      lift_bottle demo --start_seed 1 --max_seed 1 --episode_num 1
+      pick_and_place_fruits demo --start_seed 1 --max_seed 50 --episode_num 10
   '
 
 EXIT_CODE=$?

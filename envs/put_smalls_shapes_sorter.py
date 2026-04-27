@@ -43,7 +43,7 @@ def set_invisible(actor):
 DELTA_HOLES = 0.078
 SHAPE_CONFIGS: dict[str, dict] = {
     'cube': {
-        'asset_path': 'cube.usd',
+        'asset_path': 'shapes/cube.usd',
         'density': 15.0,
         'grasp_z': 0.012,
         "grasp_pos_floor": 0.040/0.078,
@@ -60,7 +60,7 @@ SHAPE_CONFIGS: dict[str, dict] = {
         ],
     },
     'cylinder': {
-        'asset_path': 'cylinder.usd',
+        'asset_path': 'shapes/cylinder.usd',
         'density': 15.0,
         'grasp_z': 0.012,
         "grasp_pos_floor": 0.037/0.078,
@@ -75,7 +75,7 @@ SHAPE_CONFIGS: dict[str, dict] = {
         ],
     },
     'triangular_prism': {
-        'asset_path': 'triangular_prism.usd',
+        'asset_path': 'shapes/triangular_prism.usd',
         'density': 15.0,
         'grasp_z': 0.012,
         'hole_x_offset': 0.0,
@@ -92,7 +92,7 @@ SHAPE_CONFIGS: dict[str, dict] = {
         ],
     },
     'star': {
-        'asset_path': 'star.usd',
+        'asset_path': 'shapes/star.usd',
         'density': 15.0,
         'grasp_z': 0.012,
         "grasp_pos_floor": 0.030/0.078,
@@ -109,10 +109,10 @@ SHAPE_CONFIGS: dict[str, dict] = {
         ],
     },
     'moon': {
-        'asset_path': 'moon.usd',
-        'density': 15.0,
+        'asset_path': 'shapes/moon.usd',
+        'density': 15,
         'grasp_z': 0.012,
-        "grasp_pos_floor": 0.018/0.078,
+        "grasp_pos_floor": 0.013/0.078,
         'hole_x_offset': 2 * DELTA_HOLES,
         'canonical_axis':    [1, 0, 0],
         'target_sorter_axis': [1, 0, 0],
@@ -154,38 +154,13 @@ _SUCCESS_Z_MIN  = 0.05
 
 @configclass
 class TaskCfg(BaseTaskCfg):
-    cameras = [
-        CameraCfg(
-            name="head",
-            prim_path="/World/envs/env_.*/Camera",
-            offset=CameraCfg.OffsetCfg(pos=(0.74, 0.0, 0.066), rot=(0.512, 0.512, 0.487, 0.487), convention="opengl"),
-            data_types=["rgb", "depth"],
-            spawn=sim_utils.PinholeCameraCfg(
-                focal_length=2.5, focus_distance=1.0, horizontal_aperture=3.6, clipping_range=(0.1, 100.0)
-            ),
-            width=480,
-            height=270,
-            update_period=1/120
-        ),
-        CameraCfg(
-            name="wrist",
-            prim_path="/World/envs/env_.*/Robot/WristCamera/Camera",
-            data_types=["rgb", "depth"],
-            spawn=None, # use existing camera
-            width=480,
-            height=270,
-            update_period=1/120,
-        )
-    ]
     step_lim: int              = 800
-    use_adaptive_grasp: bool   = False
-    use_force_grasp: bool      = True
-    squeeze_steps: int         = 30
+    use_adaptive_grasp: bool   = True
+    use_force_grasp: bool      = False
     force_fast = 50 
     force_slow = 20 
-    n_objects: int             = 3 # Default value
-
-
+    n_objects = 3 # Default value
+    depth_threshold = 27.5
 
 # ── Task implementation ───────────────────────────────────────────────────────
 
@@ -248,6 +223,7 @@ class Task(BaseTask):
         xform.ClearXformOpOrder()
         xform.AddTranslateOp().Set(Gf.Vec3d(float(p[0]), float(p[1]), float(p[2])))
         xform.AddOrientOp().Set(Gf.Quatd(float(w), float(x), float(y), float(z)))
+    
     def create_actors(self):
         """Spawn all possible shape actors (hidden off-table) and the drawer."""
         # All shapes are created at episode init; unused ones are moved far away
@@ -286,7 +262,6 @@ class Task(BaseTask):
             pose=_DRAWER_BASE_POSE,
         )
         self._drawer_visual.freeze()"""
-
 
     def _random_init_poses(self, n: int, min_dist: float = 0.15) -> list:
         """
@@ -344,6 +319,7 @@ class Task(BaseTask):
                 )
 
         return poses
+    
     def _reset_actors(self):
         self._robot_manager._reset_idx()
         # Randomly choose nb of shape present on the tables
@@ -389,7 +365,6 @@ class Task(BaseTask):
             'instruction': self.instruction,
         }
 
-
     def _build_grasp_pose(self) -> tuple:
         target = self._shapes[self._target_name]
         cfg    = SHAPE_CONFIGS[self._target_name]
@@ -420,9 +395,7 @@ class Task(BaseTask):
         return grasp_pose, contact_idx
 
     def pre_move(self):
-        print("A")
-        self.move(self.atom.open_gripper(force=self.cfg.force_fast,steps=20))
-        print("A")
+        self.move(self.atom.open_gripper(pos=1,force=self.cfg.force_fast))
 
     def _compute_z_rotation_correction(self, shape_name: str) -> float:
         """Returns the minimum Z-rotation (radians) to align shape with its hole."""
@@ -496,21 +469,11 @@ class Task(BaseTask):
             is_close=False,
         ))
         force_to_apply = self.cfg.force_slow if self._target_name == 'moon' else self.cfg.force_fast 
-        pos_floor = cfg.get('grasp_pos_floor', 0.0)                                                                             
-        self.move(self.atom.close_gripper(pos=pos_floor, force=force_to_apply))
-        robot = self._robot_manager                                                                                                                                                                                                                                 
-        fingers = robot.robot.data.joint_pos[0, robot._gripper_ids]
-        print(f"[DEBUG] Finger joints: j1={fingers[0]:.5f}  j2={fingers[1]:.5f}  "                                                                                                                                                                                  
-                f"asymmetry={abs(fingers[0]-fingers[1])*1000:.2f} mm")                                                                                                                                                                                                
-                                                                                                                                                                                                                                                                    
-        inhand = robot.get_inhand_pose(self._shapes[self._target_name])                                                                                                                                                                                             
-        print(f"[DEBUG] In-hand offset (gripper-center frame): {inhand.p}")  
+        self.move(self.atom.close_gripper(force=force_to_apply,depth_threshold=self.cfg.depth_threshold))
 
-        
         # 2. Lift clear of neighbouring shapes and above the sorter top (0.40 m)
         # Grasp is near the piece top (~0.23 m); lift 0.25 m → EE at ~0.48 m
         self.move(self.atom.move_by_displacement(z=0.2))
-
         self.check_mid_failure()
 
         # 3. Move above the correct hole for this shape.
@@ -544,7 +507,7 @@ class Task(BaseTask):
             if abs(x_err) > 0.002 or abs(y_err) > 0.002:
                 self.move(self.atom.move_by_displacement(x=x_err, y=y_err), time_dilation_factor=0.5)
 
-        SUCCESS_DESCENT = 0.1   # m — exit both loops if we descend this much
+        SUCCESS_DESCENT = 0.15   # m — exit both loops if we descend this much
         STEP_DOWN       = 0.005 # m — per step
         STUCK_TOL       = 0.001 # m — if actual movement < this we consider it stuck
 
@@ -582,8 +545,8 @@ class Task(BaseTask):
         
 
         self.move(self.atom.open_gripper(force=self.cfg.force_fast, steps=40))
-        # 6. Hold for final observation frames
-        self.delay(10, is_save=True)
+        # 6. Hold for object to fall
+        self.delay(15, is_save=False)
 
     def check_mid_failure(self) -> bool:
         pose_object = self._shapes[self._target_name].get_pose().p
@@ -600,12 +563,7 @@ class Task(BaseTask):
 
 
         xy_ok  = np.all(np.abs(obj_p[:2] - hole_p[:2]) < _SUCCESS_XY_TOL)
-        print("xy_ok",xy_ok)
-
-        print("Z1", obj_p[2])
-        print("Z2",drawer_p[2])
         z_ok   = obj_p[2] < drawer_p[2] + _SUCCESS_Z_MIN
-        print("z_ok",z_ok)
         in_zone = xy_ok and z_ok
 
         print(

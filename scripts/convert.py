@@ -45,11 +45,12 @@ parser.add_argument(
 parser.add_argument(
     "--collision-approximation",
     type=str,
-    default="convexDecomposition",
+    default="none",
     choices=["convexDecomposition", "convexHull", "boundingCube", "boundingSphere", "meshSimplification", "none"],
     help=(
-        'The method used for approximating collision mesh. Set to "none" '
-        "to not add a collision mesh to the converted mesh."
+        'The method used for approximating collision mesh. Defaults to "none" '
+        "because UIPC handles its own contact — do not add a PhysX collision mesh "
+        "for UIPC FEM objects. Set to convexDecomposition etc. only for PhysX rigid bodies."
     ),
 )
 parser.add_argument(
@@ -109,8 +110,8 @@ from isaaclab.sim.utils import export_prim_to_file
 
 from pathlib import Path
 from pxr import Usd, Sdf, Gf
-from scripts.utils.mesh_gen import MeshGenerator, TetMeshCfg
-
+# After — matches tacex_uipc.utils used in UipcObject
+from tacex_uipc.utils import MeshGenerator, TetMeshCfg
 # Formats that require the omni.kit.asset_converter step
 MESH_FORMATS = {".obj", ".stl", ".fbx", ".glb"}
 # Formats that are already USD — skip conversion
@@ -265,8 +266,14 @@ class MeshConverter(AssetConverterBase):
             )
 
         # --- Step 1: omni.kit.asset_converter ---
+        # Convert to an intermediate file so the wrapper stage (Step 2) can
+        # reference it without overwriting the file it references.
+        raw_usd_path = os.path.join(
+            self.usd_dir,
+            os.path.splitext(self.usd_file_name)[0] + "_meshes.usd",
+        )
         asyncio.get_event_loop().run_until_complete(
-            self._convert_mesh_to_usd(in_file=cfg.asset_path, out_file=self.usd_path)
+            self._convert_mesh_to_usd(in_file=cfg.asset_path, out_file=raw_usd_path)
         )
 
         # --- Step 2: rebuild stage structure ---
@@ -275,7 +282,7 @@ class MeshConverter(AssetConverterBase):
         UsdGeom.SetStageMetersPerUnit(temp_stage, 1.0)
         UsdPhysics.SetStageKilogramsPerUnit(temp_stage, 1.0)
         base_prim = temp_stage.DefinePrim(f"/{mesh_file_basename}", "Xform")
-        base_prim.GetReferences().AddReference(self.usd_path)
+        base_prim.GetReferences().AddReference(raw_usd_path)
         temp_stage.SetDefaultPrim(base_prim)
         temp_stage.Export(self.usd_path)
 
@@ -361,7 +368,13 @@ class MeshConverter(AssetConverterBase):
     # Tet mesh generation (unchanged)
     # ------------------------------------------------------------------
 
-    def gen_tet(self, prim: UsdGeom.Mesh, backend='tetgen'):
+    def gen_tet(self, prim: UsdGeom.Mesh, backend='ftetwild'):
+        """Generate a tetrahedral mesh from a USD mesh prim.
+
+        Parameters match UipcObject's runtime fallback exactly so that
+        precomputed tet attributes are bit-for-bit consistent with what
+        the simulator would generate on the fly.
+        """
         if backend == 'tetgen':
             import tetgen
             import pymeshfix
@@ -383,9 +396,7 @@ class MeshConverter(AssetConverterBase):
                 remove_smallest_components=False
             )
 
-            points, triangles = v_clean, f_clean
-
-            tg = tetgen.TetGen(points, triangles)
+            tg = tetgen.TetGen(v_clean, f_clean)
             tg.tetrahedralize()
 
             grid = tg.grid
@@ -410,15 +421,14 @@ class MeshConverter(AssetConverterBase):
                 joincomp=False,
                 remove_smallest_components=False
             )
-            surf_indices = surf_faces_clean.flatten().tolist()
-            surf_points = surf_points_clean.tolist()
-            return tet_points, tet_indices, surf_points, surf_indices
-        else:
+            return tet_points, cells.flatten().tolist(), surf_points_clean.tolist(), surf_faces_clean.flatten().tolist()
+
+        else:  # ftetwild — mirrors UipcObject.__init__ fallback exactly
             mesh_gen = MeshGenerator(config=TetMeshCfg(
-                stop_quality=6,
+                stop_quality=8,    # was 6 in converter, 8 in UipcObject  ← aligned
                 max_its=100,
-                edge_length_r=args_cli.edge_length_r,
-                epsilon_r=0.01
+                edge_length_r=1 / 5,  # was args_cli.edge_length_r (default 0.25), UipcObject uses 0.2 ← aligned
+                epsilon_r=0.001    # was 0.01 in converter, 0.001 in UipcObject ← aligned
             ))
             return mesh_gen.generate_tet_mesh_for_prim(prim)
 
@@ -475,7 +485,10 @@ def convert_mesh(
         mass_props = None
         rigid_props = None
 
-    collision_props = schemas_cfg.CollisionPropertiesCfg(collision_enabled=True)
+    if collision_approximation == "none":
+        collision_props = None
+    else:
+        collision_props = schemas_cfg.CollisionPropertiesCfg(collision_enabled=True)
     mesh_converter_cfg = MeshConverterCfg(
         mass_props=mass_props,
         rigid_props=rigid_props,

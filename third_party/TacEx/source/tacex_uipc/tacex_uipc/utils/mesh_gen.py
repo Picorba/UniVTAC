@@ -264,8 +264,71 @@ class MeshGenerator:
         return tet_points, tet_indices, surf_points, surf_indices
 
     @staticmethod
+    def _remap_uvs_to_tet_surface(
+        prim: UsdGeom.Mesh,
+        surf_points,
+        triangles: np.ndarray,
+    ):
+        """Return faceVarying UV array remapped from the original mesh UVs to the tet surface.
+
+        For each tet-surface vertex we find the nearest vertex in the original mesh and
+        borrow its UV coordinate.  This preserves atlas-based textures after the topology
+        swap performed by update_usd_mesh.
+
+        Returns None when the prim has no UV primvar or original data is empty.
+        """
+        pv_api = UsdGeom.PrimvarsAPI(prim)
+        if not pv_api.HasPrimvar("primvars:st"):
+            return None
+
+        pv = pv_api.GetPrimvar("primvars:st")
+        orig_points_vt = prim.GetPointsAttr().Get()
+        if orig_points_vt is None or len(orig_points_vt) == 0:
+            return None
+
+        orig_points = np.array(orig_points_vt, dtype=np.float32)
+
+        # Resolve per-vertex UVs from whatever interpolation the source uses.
+        interp = pv.GetInterpolation()
+        if interp in (UsdGeom.Tokens.faceVarying, "faceVarying"):
+            raw = pv.ComputeFlattened()
+            if raw is None or len(raw) == 0:
+                return None
+            raw = np.array(raw, dtype=np.float32)
+            face_indices = np.array(prim.GetFaceVertexIndicesAttr().Get(), dtype=np.int32)
+            n = len(orig_points)
+            uv_sum = np.zeros((n, 2), dtype=np.float32)
+            uv_cnt = np.zeros(n, dtype=np.float32)
+            np.add.at(uv_sum, face_indices, raw)
+            np.add.at(uv_cnt, face_indices, 1.0)
+            vert_uvs = uv_sum / np.maximum(uv_cnt[:, None], 1.0)
+        elif interp in (UsdGeom.Tokens.vertex, "vertex"):
+            raw = pv.ComputeFlattened()
+            if raw is None or len(raw) == 0:
+                return None
+            vert_uvs = np.array(raw, dtype=np.float32)
+        else:
+            return None
+
+        # Nearest-neighbour: tet surf vertex → closest original mesh vertex.
+        surf_arr = np.array(surf_points, dtype=np.float32)
+        # Chunked to keep peak memory bounded (~64 MB per chunk at 4 k verts).
+        chunk = 512
+        nearest = np.empty(len(surf_arr), dtype=np.int32)
+        for start in range(0, len(surf_arr), chunk):
+            end = min(start + chunk, len(surf_arr))
+            d2 = np.sum((surf_arr[start:end, None, :] - orig_points[None, :, :]) ** 2, axis=-1)
+            nearest[start:end] = np.argmin(d2, axis=-1)
+
+        # Build faceVarying UV array (one entry per face-vertex).
+        return vert_uvs[nearest][triangles].reshape(-1, 2)
+
+    @staticmethod
     def update_usd_mesh(prim: UsdGeom.Mesh, surf_points, triangles: list[int], replace_color:bool=False):
         triangles = np.array(triangles).reshape(-1, 3)
+
+        # Remap UVs BEFORE replacing topology so we still have the original points.
+        remapped_uvs = MeshGenerator._remap_uvs_to_tet_surface(prim, surf_points, triangles)
 
         prim.GetPointsAttr().Set(surf_points)
         prim.GetFaceVertexCountsAttr().Set(
@@ -285,22 +348,18 @@ class MeshGenerator:
             prim.CreateDisplayColorPrimvar(UsdGeom.Tokens.faceVarying).Set(colors)  # num_surf_tri * 3
 
         # texture map
-        uv_coor = np.indices((int(triangles.size), 2)).transpose((1, 2, 0)).reshape((-1, 2))
-
         pv_api = UsdGeom.PrimvarsAPI(prim)
         if pv_api.HasPrimvar("primvars:st"):
             pv = pv_api.GetPrimvar("primvars:st")
             pv.SetInterpolation(UsdGeom.Tokens.faceVarying)
-            # if uv_coor.size != pv.Get():
-            #     print("primvars:st array has the wrong size - updating it")
-            #     pv.Set(uv_coor)
+            if remapped_uvs is not None:
+                pv.Set(remapped_uvs)
         else:
-            # set some values for the uv_coor variable, if no values exist
+            uv_coor = np.indices((int(triangles.size), 2)).transpose((1, 2, 0)).reshape((-1, 2))
             pv = pv_api.CreatePrimvar(
                 "primvars:st",
                 Sdf.ValueTypeNames.TexCoord2fArray,
                 UsdGeom.Tokens.faceVarying,
-                # UsdGeom.Tokens.uniform,
                 uv_coor.size,
             )
             pv.Set(uv_coor)

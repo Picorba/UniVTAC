@@ -305,9 +305,7 @@ class Atom:
         return [Action("move", target_pose=target_pose)]
     
     def close_gripper(self, pos: float = 0.0, depth_threshold:Literal['auto']|float='auto',
-                      force: float = None, steps: int | Literal['auto'] = 'auto',
-                      extra_steps: int = 0,
-                      squeeze_force: float = None, squeeze_steps: int = 20):
+                      force: float = None, steps: int | Literal['auto'] = 'auto'):
         """Close the gripper.
 
         Args:
@@ -318,11 +316,6 @@ class Atom:
             steps: Number of simulation steps to apply the force.  'auto' keeps the current
                    behaviour of stopping once the gripper position stabilises.  Has no effect
                    when ``use_force_grasp`` is False.
-            extra_steps: Number of additional gentle position-closing steps after contact
-                         is detected (adaptive grasp mode only).  Each step closes ~0.05 mm.
-            squeeze_force: Force in Newtons to apply after adaptive contact detection to
-                           ensure a firm grip.  None disables the squeeze.
-            squeeze_steps: Number of steps to hold ``squeeze_force`` (default 20).
         """
         if depth_threshold == 'auto':
             if self.task.cfg.use_adaptive_grasp:
@@ -331,8 +324,7 @@ class Atom:
                 depth_threshold = None
         return [Action("close", target_gripper_pos=pos,
                        gripper_depth_threshold=depth_threshold, gripper_force=force,
-                       gripper_force_steps=steps, gripper_extra_steps=extra_steps,
-                       gripper_squeeze_force=squeeze_force, gripper_squeeze_steps=squeeze_steps)]
+                       gripper_force_steps=steps)]
 
     def open_gripper(self, pos: float = None, depth_threshold: float = None, force: float = None,
                      steps: int | Literal['auto'] = 'auto'):

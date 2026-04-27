@@ -145,10 +145,6 @@ class RobotManager:
             self.robot.set_joint_velocity_target(vel, joint_ids=self._gripper_ids, env_ids=env_ids)
         # Always zero the effort target when switching to position control so that any
         # previously-set force (from set_gripper_effort) does not persist in the buffer.
-        self.robot.set_joint_effort_target(
-            torch.zeros(2, dtype=torch.float32, device=self.device),
-            joint_ids=self._gripper_ids, env_ids=env_ids,
-        )
         if force:
             self.robot.root_physx_view.set_dof_positions(
                 self.robot._data.joint_pos_target,

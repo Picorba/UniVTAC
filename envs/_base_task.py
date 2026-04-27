@@ -44,7 +44,8 @@ from .sensors.camera import CameraManager, CameraCfg
 from .sensors.tactile import TactileManager
 from .sensors.contact import ContactSensorManager, ObjectContactSensorCfg
 
-
+from pxr import UsdGeom,UsdLux, Gf
+import omni.usd
 @configclass
 class BaseTaskCfg(DirectRLEnvCfg):
     logger_level = "error"
@@ -145,6 +146,18 @@ class BaseTaskCfg(DirectRLEnvCfg):
     grasp_force: float = 10.0  # in Newtons; used when use_force_grasp=True
     reset_time_limit: float = 1000.0  # in seconds
 
+    random_camera: bool = True
+    # 6 positions around the scene, slightly above, mid-distance
+    # Each entry: (pos_xyz, rot_xyzw) in world space, opengl convention
+    # Scene center is roughly (0.5, 0, 0.15)
+    CAMERA_PRESETS: list = [
+        {"pos": (0.5,  -0.80, 1), "rot": (0.331,   0.0,   0.0,  0.9436)},  # front
+        {"pos": (0.5,  0.8, 1), "rot": (0.0,   0.331, 0.9436,  0)},  # front-right
+        {"pos": (1, 0.8, 1), "rot": (0.1018,  0.3549, 0.8933,  0.2562)},  # back-right
+        {"pos": (1, 0, 1), "rot": (0.1625,  0.1625, 0.6882,    0.6882)},  # back
+        {"pos": (1,0.8, 1), "rot": (0.1018,  0.3549, -0.8933, 0.2562)},  # back-left
+    ]
+
     cameras: list[CameraCfg] = [
         CameraCfg(
             name="head",
@@ -193,6 +206,7 @@ class BaseTaskCfg(DirectRLEnvCfg):
     action_space = 0
     observation_space = 0
     state_space = 0
+    i_cam = 0
 
 class BaseTask(UipcRLEnv):
     cfg: BaseTaskCfg
@@ -243,7 +257,8 @@ class BaseTask(UipcRLEnv):
         self._tactile_manager.setup()
         self._tactile_manager.set_debug_vis(self.cfg.debug_vis)
         self.set_debug_vis(self.cfg.debug_vis)
-    
+
+
     def load_robot_and_sensors(self, cfg:BaseTaskCfg):
         data_type = ["camera_depth", "tactile_rgb", "marker_rgb", "marker_motion"]
         contact_prim_path = getattr(cfg, 'fots_contact_prim_path', None)
@@ -439,11 +454,52 @@ class BaseTask(UipcRLEnv):
 
         if self.cfg.random_texture:
             Actor._set_texture('/World/envs/env_0/ground_plate', 'random', self.rng)
+        if self.cfg.random_camera:
+            stage = omni.usd.get_context().get_stage()
+            self.cfg.i_cam = int(self.rng.integers(0, len(self.cfg.CAMERA_PRESETS)))
+            preset = self.cfg.CAMERA_PRESETS[self.cfg.i_cam]
 
+            cam_prim_path = self.cfg.cameras[0].prim_path.replace('env_.*', 'env_0')
+            cam_prim = stage.GetPrimAtPath(cam_prim_path)
+
+            if cam_prim.IsValid():
+                pos = preset["pos"]
+                rot = preset["rot"]  # (x, y, z, w)
+
+                # Convert quaternion to GfRotation then to transformation matrix
+                # bypasses XformCommonAPI entirely — works regardless of existing xform ops
+                quat = Gf.Quatd(rot[3], rot[0], rot[1], rot[2])  # (w, x, y, z)
+                rotation = Gf.Matrix3d(quat)
+                
+                matrix = Gf.Matrix4d()
+                matrix.SetIdentity()
+                matrix.SetRotateOnly(rotation)
+                matrix.SetTranslateOnly(Gf.Vec3d(pos[0], pos[1], pos[2]))
+
+                xformable = UsdGeom.Xformable(cam_prim)
+                ops = xformable.GetOrderedXformOps()
+
+                # Find and set existing translate/orient ops if present (Isaac Lab pattern)
+                # otherwise add new ones
+                translate_op = next((op for op in ops if op.GetOpType() == UsdGeom.XformOp.TypeTranslate), None)
+                orient_op    = next((op for op in ops if op.GetOpType() == UsdGeom.XformOp.TypeOrient), None)
+                transform_op = next((op for op in ops if op.GetOpType() == UsdGeom.XformOp.TypeTransform), None)
+
+                if transform_op is not None:
+                    # Single matrix op — write the full matrix
+                    transform_op.Set(matrix)
+                elif translate_op is not None and orient_op is not None:
+                    # Separate translate + orient ops — write each individually
+                    translate_op.Set(Gf.Vec3d(pos[0], pos[1], pos[2]))
+                    orient_op.Set(quat)
+                else:
+                    # No compatible ops found — clear and write a fresh transform
+                    xformable.ClearXformOpOrder()
+                    xformable.AddTransformOp().Set(matrix)
+            else:
+                print(f"[WARN] Camera prim not found at: '{cam_prim_path}'")
 
         if self.cfg.random_background or self.cfg.random_light:
-            from pxr import UsdLux
-            import omni.usd
 
             stage = omni.usd.get_context().get_stage()
             # Get handle on existing prim — do NOT call .Define() as it re-creates
@@ -466,8 +522,10 @@ class BaseTask(UipcRLEnv):
 
         # always log — unconditional
 
-        self.domain_rand_params['i_bg'] = self.cfg.BACKGROUND_FILES[self.cfg.i_bg]
+        # already in _reset_idx unconditional log block:
+        self.domain_rand_params['i_bg']  = self.cfg.BACKGROUND_FILES[self.cfg.i_bg]
         self.domain_rand_params['i_light'] = self.cfg.LIGHT_INTENSITIES[self.cfg.i_light]
+        self.domain_rand_params['i_cam'] = self.cfg.i_cam  # ← add this
         self._tactile_manager._reset_idx()
         self._actor_manager._reset_idx(self.rng)
         self._robot_manager._reset_idx()
@@ -775,6 +833,7 @@ class BaseTask(UipcRLEnv):
                             'num_steps': -2,
                             'target_force': magnitude,
                             'force_steps': action.args.get('gripper_force_steps', 'auto'),
+                            'depth_threshold': action.args.get('depth_threshold', None),
                             'target_pos': action.target_gripper_pos,  # [0,1]; None = no position limit
                         }
                     elif self.cfg.use_adaptive_grasp:
@@ -784,9 +843,7 @@ class BaseTask(UipcRLEnv):
                             'num_steps': -1,
                             'target': target_pos,
                             'threshold': action.args.get('gripper_depth_threshold', gripper_depth_threshold),
-                            'extra_steps': action.args.get('gripper_extra_steps', 0),
-                            'squeeze_force': action.args.get('gripper_squeeze_force'),
-                            'squeeze_steps': action.args.get('gripper_squeeze_steps', 20),
+
                         }
                     else:
                         control_seq['gripper'] = self._robot_manager.plan_gripper(
@@ -833,8 +890,8 @@ class BaseTask(UipcRLEnv):
         if gripper_steps == -1: # adaptive grasp
             idx, gripper_active = 0, True
             gripper_planner = self.adaptive_set_gripper(
-                gripper_seq['target'], gripper_seq['threshold'],
-                extra_steps=gripper_seq.get('extra_steps', 0))
+                gripper_seq['target'], gripper_seq['threshold'])
+
             while True:
                 if idx >= arm_steps and not gripper_active:
                     break
@@ -848,43 +905,55 @@ class BaseTask(UipcRLEnv):
                     self._robot_manager.set_gripper(pos, vel)
                 self._step(is_save)
                 idx += 1
-            # Post-contact force squeeze: apply a fixed force for N steps to
-            # ensure the fingers are firmly seated against the object.
-            squeeze_force = gripper_seq.get('squeeze_force')
-            if squeeze_force is not None:
-                squeeze_steps = gripper_seq.get('squeeze_steps', 20)
-                for target_force, _ in self.force_control_gripper(
-                        squeeze_force, steps=squeeze_steps):
-                    self._robot_manager.set_gripper_effort(target_force)
-                    self._step(is_save)
-                self._gripper_grasping = True
-                self._gripper_hold_qpos = self._robot_manager.get_gripper_qpos()
-        elif gripper_steps == -2:  # force control
+
+        elif gripper_steps == -2:
             idx, gripper_active = 0, True
+            hold_triggered = False
+            hold_pos = None
+            initial_force = gripper_seq['target_force']
+
             gripper_planner = self.force_control_gripper(
-                gripper_seq['target_force'],
+                initial_force,
                 target_pos=gripper_seq.get('target_pos'),
                 steps=gripper_seq.get('force_steps', 'auto'),
+                min_depth_threshold=gripper_seq.get('depth_threshold'),
             )
+
             while True:
-                # When running alongside arm motion, stop as soon as arm finishes.
-                # When standalone (no arm), let the generator decide when to stop.
                 arm_done = idx >= arm_steps
                 if arm_done and (arm_steps > 0 or not gripper_active):
                     break
+
                 if arm_seq is not None and idx < arm_steps:
                     self._robot_manager.set_arm(
                         arm_seq['position'][idx],
                         arm_seq['velocity'][idx]
                     )
+
                 if gripper_active:
                     target_force, gripper_active = next(gripper_planner)
+                    if not gripper_active and not hold_triggered:
+                        hold_triggered = True
+                        hold_qpos_val = self._robot_manager.get_gripper_qpos()
+                        hold_pos = torch.tensor(
+                            [hold_qpos_val, hold_qpos_val],
+                            device=self._robot_manager.device
+                        )
                     self._robot_manager.set_gripper_effort(target_force)
+
+                elif hold_triggered:
+                    # force=True (default) → set_dof_positions → rebound impossible
+                    self._robot_manager.set_gripper(hold_pos, torch.zeros_like(hold_pos))
+
                 self._step(is_save)
                 idx += 1
+
             self._gripper_grasping = True
-            self._gripper_grasping_force = gripper_seq['target_force']
-            self._gripper_hold_qpos = self._robot_manager.get_gripper_qpos()
+            self._gripper_grasping_force = initial_force
+            self._gripper_hold_qpos = (
+                hold_qpos_val if hold_triggered
+                else self._robot_manager.get_gripper_qpos()
+            )
         else:
             max_control_len = max(arm_steps, gripper_steps)
             for idx in range(max_control_len):
@@ -899,9 +968,6 @@ class BaseTask(UipcRLEnv):
                         gripper_seq['velocity'][idx]
                     )
                 elif self._gripper_grasping:
-                    # Hold the gripper at its post-grasp position using PD control.
-                    # Re-applying force here conflicts with set_arm(force=True) which
-                    # writes set_dof_positions for all joints, causing physics instability.
                     hold = torch.tensor(
                         [self._gripper_hold_qpos, self._gripper_hold_qpos],
                         device=self._robot_manager.device,
@@ -960,62 +1026,86 @@ class BaseTask(UipcRLEnv):
 
         return exec_success, self.eval_success
 
-    def force_control_gripper(self, target_force: float, target_pos: float = None,
-                              steps: int | Literal['auto'] = 'auto',
-                              max_steps: int = 300, stable_window: int = 5, stable_tol: float = 1e-5):
-        """Generator that applies a gripping force, optionally stopping at a target position.
-
-        Yields ``(target_force, active)`` each step.
-
-        Args:
-            target_force: Gripping force in Newtons (positive = closing, negative = opening).
-            target_pos:   Target openness in [0, 1] (0 = fully closed, 1 = fully open).
-                          When provided, the generator stops as soon as the gripper reaches
-                          or passes the target qpos in the direction of the force.
-                          When None, behaviour is unchanged (force-only).
-            steps: Number of simulation steps.  ``'auto'`` stops when stable or target reached.
-            max_steps: Hard upper bound in ``'auto'`` mode.
-            stable_window: Window size for stabilisation detection.
-            stable_tol: Position range (m) considered stable.
+    def force_control_gripper(
+        self,
+        target_force: float,
+        target_pos: float = None,
+        steps: int | Literal['auto'] = 'auto',
+        max_steps: int = 300,
+        stable_window: int = 5,
+        stable_tol: float = 1e-5,
+        min_depth_threshold: float = None,  # <-- NEW: in mm, stops if ANY tactile < this
+    ):
         """
-        target_qpos = (self._robot_manager.gripper_percent2qpos(target_pos)
-                       if target_pos is not None else None)
+        Args:
+            min_depth_threshold: Tactile depth (mm) below which force is immediately
+                                released to prevent over-compression. Maps to the
+                                cfg.robot.contact_threshold lower bound if None is
+                                undesired — caller should pass it explicitly.
+        """
+        target_qpos = (
+            self._robot_manager.gripper_percent2qpos(target_pos)
+            if target_pos is not None else None
+        )
+        # --- safety: resolve depth threshold ---
+        if min_depth_threshold is not None:
+            _depth_limit = min_depth_threshold * torch.ones_like(
+                self._tactile_manager.get_min_depth()
+            )
+        else:
+            _depth_limit = None
+
         def _target_reached():
             if target_qpos is None:
                 return False
             current = self._robot_manager.get_gripper_qpos()
-            # closing force (positive) → qpos decreases; opening force (negative) → qpos increases
-            if target_force >= 0:
-                return current <= target_qpos
-            else:
-                return current >= target_qpos
+            return current <= target_qpos if target_force >= 0 else current >= target_qpos
 
+        def _tactile_overloaded():
+            """True if any tactile sensor is compressed beyond the safety threshold."""
+            if _depth_limit is None:
+                return False
+            depth = self._tactile_manager.get_min_depth()
+            return torch.any(depth < _depth_limit).item()
+
+        # --- fixed-steps mode ---
         if steps != 'auto':
             for _ in range(steps):
-                if _target_reached():
+                if _target_reached() or _tactile_overloaded():
                     break
                 yield target_force, True
             yield target_force, False
             return
 
+        # --- auto mode ---
         pos_history = []
         for _ in range(max_steps):
             if _target_reached():
                 break
+
+            if _tactile_overloaded():
+                print(
+                    f"[force_control_gripper] Tactile depth below threshold "
+                    f"({min_depth_threshold} mm). Releasing force to prevent "
+                    f"data corruption at step {self.step_count}."
+                )
+                break
+
             pos_history.append(self._robot_manager.get_gripper_qpos())
             if len(pos_history) > stable_window:
                 pos_history.pop(0)
-                print("MAX DELTA FINGER",max(pos_history) - min(pos_history))
                 if (max(pos_history) - min(pos_history)) < stable_tol:
                     break
+
             yield target_force, True
+
         yield target_force, False
 
-    def adaptive_set_gripper(self, qpos, depth_threshold:float=None, extra_steps:int=0):
+    def adaptive_set_gripper(self, qpos, depth_threshold:float=None):
         """Generator that closes/opens the gripper adaptively using tactile depth.
 
         After contact is detected (all tactile depths < ``depth_threshold``), the
-        gripper continues closing for ``extra_steps`` additional steps at
+        gripper continues closing for ```` additional steps at
         ``contact_step`` resolution before stopping.  This prevents the gripper
         from under-gripping while avoiding the over-closing that pure
         position/force control causes on deformable objects.
@@ -1025,10 +1115,6 @@ class BaseTask(UipcRLEnv):
                   closing so the fingers never go below this value.
             depth_threshold: Tactile depth (mm) below which contact is considered
                 established.  None disables contact-based stopping.
-            extra_steps: Number of additional closing steps to execute after
-                contact is first detected.  Each step closes by ``contact_step``
-                (0.05 mm) clamped to ``qpos``.  Default 0 preserves original
-                behaviour.
         """
         max_steps = 1000
         default_step, contact_step = 0.0005, 0.00005
@@ -1049,15 +1135,6 @@ class BaseTask(UipcRLEnv):
                     step_size = -default_step
                 elif depth_threshold is not None:
                     if torch.all(tactile_depth < depth_threshold):
-                        # Contact detected — apply gentle extra closing steps before stopping.
-                        for _ in range(extra_steps):
-                            current_qpos = self._robot_manager.get_gripper_qpos()
-                            extra_target = max(current_qpos - contact_step, qpos)
-                            position = torch.tensor(
-                                [extra_target, extra_target], device=self._robot_manager.device)
-                            velocity = (position - current_qpos) / self.cfg.sim.dt
-                            last_qpos = current_qpos
-                            yield position, velocity, True
                         break
                     else:
                         step_size = - min(

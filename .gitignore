@@ -71,6 +71,7 @@ failure_analysis/
 *.npz
 *.npy
 *.png
+*.usdz
 
 # Notebooks (or strip outputs before committing)
 *.ipynb

@@ -15,6 +15,7 @@ import omni.usd
 import usdrt
 import usdrt.UsdGeom
 from isaacsim.core.prims import XFormPrim
+
 from pxr import UsdGeom
 
 try:
@@ -156,13 +157,11 @@ class UipcObject(AssetBase):
             usd_mesh = UsdGeom.Mesh(prim_children[0])
             usd_mesh_path = str(usd_mesh.GetPath())
             omni.log.info("usd_mesh_path ", usd_mesh_path)
-
             # Load precomputed mesh data from USD prim.
             tet_points = np.array(prim_children[0].GetAttribute("tet_points").Get())
             tet_indices = prim_children[0].GetAttribute("tet_indices").Get()
             surf_points = np.array(prim_children[0].GetAttribute("tet_surf_points").Get())
             tet_surf_indices = prim_children[0].GetAttribute("tet_surf_indices").Get()
-            
             replace_color = False
             if tet_indices is None:
                 mesh_gen = MeshGenerator(config=TetMeshCfg(
@@ -201,43 +200,33 @@ class UipcObject(AssetBase):
             surf = extract_surface(mesh)
             tet_surf_points_world = surf.positions().view().reshape(-1, 3)
             tet_surf_tri = surf.triangles().topo().view().reshape(-1).tolist()
-
-            # Set Vertex and Triangle data into USD mesh for rendering, skip
-            MeshGenerator.update_usd_mesh(
-                prim=usd_mesh, surf_points=tet_surf_points_world, triangles=tet_surf_tri,
-                replace_color=replace_color
+            # Set Vertex and Triangle data into USD mesh for rendering, skip                                                                                                                                                                      
+            MeshGenerator.update_usd_mesh(                                                                                                                                                                                                        
+               prim=usd_mesh, surf_points=tet_surf_points_world, triangles=tet_surf_tri,                                                                                                                                                         
+                replace_color=replace_color                                                                                                                                                                                                       
             )
-
+            mesh = self.uipc_meshes[0] #todo code properly cloned envs (i.e. for instanced objects?) 
             # enable contact for uipc meshes etc.
-            # mesh = self.uipc_meshes[0] #todo code properly cloned envs (i.e. for instanced objects?)
             self._create_constitutions(mesh)
-
-            # setup mesh updates via Fabric
-            fabric_prim = self.stage.GetPrimAtPath(usdrt.Sdf.Path(usd_mesh_path))
-            if not fabric_prim:
-                omni.log.warning(f"Prim at path {usd_mesh_path} is not in Fabric")
-            if not fabric_prim.HasAttribute("points"):
+            fabric_prim = self.stage.GetPrimAtPath(usdrt.Sdf.Path(usd_mesh_path))                                                                                                                                                                 
+            if not fabric_prim:                                                                                                                                                                                                                   
+                omni.log.warning(f"Prim at path {usd_mesh_path} is not in Fabric")         
+                                                                                                                                                                       
+            if not fabric_prim.HasAttribute("points"):                                                                                                                                                                                            
                 omni.log.warning(f"Prim at path {usd_mesh_path} does not have points attribute")
 
-            # Tell OmniHydra to render points from Fabric
-            if not fabric_prim.HasAttribute("Deformable"):
+            if not fabric_prim.HasAttribute("Deformable"):                                                                                                                                                                                        
                 fabric_prim.CreateAttribute("Deformable", usdrt.Sdf.ValueTypeNames.PrimTypeTag, True)
 
-            # extract world transform
-            rtxformable = usdrt.Rt.Xformable(fabric_prim)
-            rtxformable.CreateFabricHierarchyWorldMatrixAttr()
-            # set world matrix to identity matrix -> uipc already gives us vertices in world frame
+            rtxformable = usdrt.Rt.Xformable(fabric_prim)                                                                                                                                                                                         
+            rtxformable.CreateFabricHierarchyWorldMatrixAttr()                                                                                                                                                                                    
+            # set world matrix to identity matrix -> uipc already gives us vertices in world frame                                                                                                                                                
             rtxformable.GetFabricHierarchyWorldMatrixAttr().Set(usdrt.Gf.Matrix4d())
-
-            # update fabric mesh with world coor. points
-            fabric_mesh_points_attr = fabric_prim.GetAttribute("points")
+            
+            fabric_mesh_points_attr = fabric_prim.GetAttribute("points")                                                                                                                                                                          
             fabric_mesh_points_attr.Set(usdrt.Vt.Vec3fArray(tet_surf_points_world))
-
             self.fabric_prim = fabric_prim
-
-            # add fabric meshes to uipc sim class for updating the render meshes
             self._uipc_sim._fabric_meshes.append(fabric_prim)
-
             # save surface offsets for finding corresponding surface points of the meshes for rendering
             num_surf_points = tet_surf_points_world.shape[0]  # np.unique(tet_surf_indices)
             self._uipc_sim._surf_vertex_offsets.append(self._uipc_sim._surf_vertex_offsets[-1] + num_surf_points)

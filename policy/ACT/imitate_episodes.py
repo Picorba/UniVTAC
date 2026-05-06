@@ -16,6 +16,7 @@ from tqdm import tqdm
 from utils import load_data  # data functions
 from utils import compute_dict_mean, set_seed, detach_dict  # helper functions
 from act_policy import ACTPolicy, CNNMLPPolicy
+from transformers import AutoProcessor
 
 import IPython
 e = IPython.embed
@@ -130,18 +131,20 @@ def make_optimizer(policy_class, policy):
         raise NotImplementedError
     return optimizer
 
+processor = AutoProcessor.from_pretrained("google/siglip-base-patch16-224")
 
 def forward_pass(data, policy):
-    cam_data, tac_data, qpos_data, action_data, is_pad = data
-    cam_data, tac_data, qpos_data, action_data, is_pad = (
-        cam_data.cuda(),
-        tac_data.cuda(),
-        qpos_data.cuda(),
-        action_data.cuda(),
-        is_pad.cuda(),
-    )
-    return policy(qpos_data, cam_data, tac_data, action_data, is_pad)
+    # data unpacking (adjust indices to match your dataloader)
+    image_data, tac_data, qpos_data, action_data, is_pad, lang = data
 
+    image_data  = image_data.cuda()
+    qpos_data   = qpos_data.cuda()
+    action_data = action_data.cuda()
+    is_pad      = is_pad.cuda()
+    tac_data    = tac_data.cuda()
+    
+    return policy(qpos_data, image_data, tac_data,
+                  actions=action_data, is_pad=is_pad, lang=lang)
 
 def train_bc(train_dataloader, val_dataloader, config):
     ckpt_dir = config["ckpt_dir"]

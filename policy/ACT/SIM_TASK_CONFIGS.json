@@ -130,5 +130,16 @@
             "tac_left",
             "tac_right"
         ]
+    },
+    "sim-pick_and_place_fruits-demo-50": {
+        "dataset_dir": "./data/sim-pick_and_place_fruits/demo-50",
+        "num_episodes": 50,
+        "episode_len": 1000,
+        "camera_names": [
+            "cam_high",
+            "cam_wrist",
+            "tac_left",
+            "tac_right"
+        ]
     }
 }

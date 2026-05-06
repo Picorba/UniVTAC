@@ -15,9 +15,15 @@ dependencies:
   - pexpect=4.8.0
   - mujoco=2.3.3
   - dm_control=1.0.9
-  - py-opencv=4.7.0
-  - matplotlib=3.7.1
+  - matplotlib=3.7.1        # ← py-opencv removed from here
   - einops=0.6.0
   - packaging=23.0
   - h5py=3.8.0
   - ipython=8.12.0
+  - numpy=1.24.3
+  - pip:
+    - opencv-python==4.7.0.72   # ← moved here, bypasses ffmpeg conflict
+    - transformers==4.38.2
+    - protobuf==3.20.3
+    - sentencepiece==0.1.99
+    - tqdm==4.65.0

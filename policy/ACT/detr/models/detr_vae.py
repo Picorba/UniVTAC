@@ -9,7 +9,7 @@ from .backbone import build_backbone, build_tactile_backbone
 from .transformer import build_transformer, TransformerEncoder, TransformerEncoderLayer
 
 import numpy as np
-
+from transformers import AutoConfig
 import IPython
 
 e = IPython.embed
@@ -81,7 +81,15 @@ class DETRVAE(nn.Module):
         self.latent_out_proj = nn.Linear(self.latent_dim, hidden_dim)  # project latent sample to embedding
         self.additional_pos_embed = nn.Embedding(2, hidden_dim)  # learned position embedding for proprio and latent
 
-    def forward(self, qpos, cam_image, tac_image, env_state, actions=None, is_pad=None):
+
+        # For text
+        hidden_dim = transformer.d_model
+        # ── TEXT TOKEN projection (new) ──────────────────────────────────────
+        config     = AutoConfig.from_pretrained("google/siglip-base-patch16-224")
+        siglip_dim = config.text_config.hidden_size          # 768
+        self.text_proj      = nn.Linear(siglip_dim, hidden_dim)
+        self.text_token_pos = nn.Embedding(1, hidden_dim)
+    def forward(self, qpos, cam_image, tac_image, env_state, actions=None, is_pad=None,text_feat=None):
         """
         qpos: batch, qpos_dim
         image: batch, num_cam, channel, height, width
@@ -144,8 +152,18 @@ class DETRVAE(nn.Module):
             # fold camera dimension into width dimension
             src = torch.cat(all_cam_features, axis=2)
             pos = torch.cat(all_cam_pos, axis=2)
+
+            if text_feat is not None:
+                text_token = self.text_proj(text_feat)          # (bs, hidden_dim)
+                text_token = text_token.unsqueeze(2)            # (bs, hidden_dim, 1)
+                text_pos   = self.text_token_pos.weight.T.unsqueeze(0)  # (1, hidden_dim, 1)
+                src = torch.cat([src, text_token], dim=2)       # (bs, hidden_dim, HW+1)
+                pos = torch.cat([pos, text_pos],   dim=2)       # (1, hidden_dim, HW+1)
+            # ─────────────────────────────────────────────────────────────
+
             hs = self.transformer(src, None, self.query_embed.weight, pos, latent_input, proprio_input,
                                   self.additional_pos_embed.weight)[0]
+
         else:
             qpos = self.input_proj_robot_state(qpos)
             env_state = self.input_proj_env_state(env_state)

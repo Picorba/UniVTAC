@@ -4,9 +4,9 @@ seed: 0
 ckpt_setting: 80
 instruction_type: seen
 instuction_file: null
-task_name: lift_bottle
-ckpt_setting: clean-80
+task_name: pick_and_place_fruits
+ckpt_setting: demo-50
 state_dim: 8           
 chunk_size: 50          
 temporal_agg: True
-ckpt_dir: /home/pierre/Documents/UniVTAC/policy/ACT/act_ckpt/act-lift_oscar/clean-80/train_config
+ckpt_dir: /home/pierre/Documents/UniVTAC/policy/ACT/act_ckpt/act-pick_and_place_fruits/demo-50/train_config

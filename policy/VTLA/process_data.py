@@ -15,7 +15,6 @@ from envs.utils.data import HDF5Handler
 def load_hdf5(dataset_paths, camera_type, downsample_factor):
     data_paths = [
         'embodiment/joint',
-        'language/instruction', 
     ]
     if camera_type == 'all':
         data_paths.append(f'observation/head/rgb')
@@ -25,10 +24,12 @@ def load_hdf5(dataset_paths, camera_type, downsample_factor):
     
     with h5py.File(str(dataset_paths[0]), 'r') as f:
         try:
+            print("A")
             f['tactile/left_tactile/rgb_marker']
             data_paths.append('tactile/left_tactile/rgb_marker')
             data_paths.append('tactile/right_tactile/rgb_marker')
         except:
+            print("B")
             data_paths.append('tactile/left_gsmini/rgb_marker')
             data_paths.append('tactile/right_gsmini/rgb_marker')
 
@@ -94,10 +95,6 @@ def _write_episodes(data, episode_num, save_path, camera_type):
     # 提取批量数据
     joint_state_all = data['embodiment/joint_state'][:, 0:8]
     joint_action_all = data['embodiment/joint_action'][:, 0:8]
-    lang_all = data['language/instruction']
-
-    if lang_all.dtype.kind == "S":
-        lang_all = np.array([x.decode("utf-8") for x in lang_all])
 
     if camera_type == 'all':
         head_cam_all = data[f'observation/head/rgb']  # (T_total, H, W, 3)
@@ -114,7 +111,6 @@ def _write_episodes(data, episode_num, save_path, camera_type):
 
         joint_state = joint_state_all[start_idx:end_idx]
         joint_action = joint_action_all[start_idx:end_idx]
-        lang = lang_all[start_idx:end_idx]
         if camera_type == 'all':
             head_cam = head_cam_all[start_idx:end_idx]
             wrist_cam = wrist_cam_all[start_idx:end_idx]
@@ -127,7 +123,6 @@ def _write_episodes(data, episode_num, save_path, camera_type):
         hdf5path = os.path.join(save_path, f"episode_{i}.hdf5")
         with h5py.File(hdf5path, "w") as f:
             f.create_dataset("action", data=np.array(joint_action))
-            f.create_dataset("language", data=lang[0].encode("utf-8"))
             obs = f.create_group("observations")
             obs.create_dataset("qpos", data=np.array(joint_state))
             image = obs.create_group("images")

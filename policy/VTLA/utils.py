@@ -3,9 +3,8 @@ import torch
 import os
 import h5py
 from pathlib import Path
-from torch.utils.data import DataLoader
+from torch.utils.data import TensorDataset, DataLoader
 from torchvision import transforms
-from transformers import AutoProcessor
 
 import IPython
 
@@ -241,17 +240,8 @@ class TacArenaDataset(torch.utils.data.Dataset):
         # normalize image and change dtype to float
         action_data = (action_data - self.norm_stats["action_mean"]) / self.norm_stats["action_std"]
         qpos_data = (qpos_data - self.norm_stats["qpos_mean"]) / self.norm_stats["qpos_std"]
-        # ADD TEXT
 
-        lang = root["/language"][()]
-        if isinstance(lang, np.ndarray):
-            if lang.dtype.kind == "S":
-                lang = [x.decode("utf-8") for x in lang]
-        else:
-            if isinstance(lang, bytes):
-                lang = lang.decode("utf-8")
-
-        return all_cam_images, all_tac_images, qpos_data, action_data, is_pad, lang
+        return all_cam_images, all_tac_images, qpos_data, action_data, is_pad
 
 
 def load_data(dataset_dir, num_episodes, camera_names, tactile_names, batch_size_train, batch_size_val, chunk_size):

@@ -2,6 +2,17 @@ import torch.nn as nn
 import os
 import torch
 import numpy as np
+# act_policy.py — add near the top of __init__ or as a module-level patch
+import sys
+import numpy as np
+
+# Compatibility shim: redirect numpy._core → numpy.core for old pickles
+if not hasattr(np, '_core'):
+    import numpy.core as _numpy_core
+    sys.modules['numpy._core'] = _numpy_core
+    sys.modules['numpy._core.multiarray'] = _numpy_core.multiarray
+    sys.modules['numpy._core.numeric'] = _numpy_core.numeric
+    
 import pickle
 from torch.nn import functional as F
 
@@ -16,9 +27,10 @@ except:
         build_CNNMLP_model_and_optimizer,
     )
 import IPython
+from transformers import SiglipTokenizer, SiglipModel
+
 
 e = IPython.embed
-
 
 class ACTPolicy(nn.Module):
 
@@ -28,15 +40,47 @@ class ACTPolicy(nn.Module):
         self.model = model  # CVAE decoder
         self.optimizer = optimizer
         self.kl_weight = args_override["kl_weight"]
+
+        self.text_tokenizer = SiglipTokenizer.from_pretrained("google/siglip-base-patch16-224")
+        self.text_encoder = SiglipModel.from_pretrained("google/siglip-base-patch16-224").text_model
+        self.text_encoder.eval()
+        self.text_encoder.to(torch.device(args_override["device"]))
+        for p in self.text_encoder.parameters():
+            p.requires_grad = False
         print(f"KL Weight {self.kl_weight}")
 
-    def __call__(self, qpos, cam_image, tac_image, actions=None, is_pad=None):
+    def forward(self, qpos, cam_image, tac_image, actions=None, is_pad=None, lang=None):
+        if lang is not None:
+            if isinstance(lang, (list, tuple)):
+                text = list(lang)
+            else:
+                text = [lang]
+
+            inputs = self.text_tokenizer(
+                text,
+                return_tensors="pt",
+                padding="max_length",   # ← required, replaces padding=True
+                truncation=True,
+                max_length=64,          # SigLIP text encoder max context
+            )
+            input_ids = inputs["input_ids"].to(qpos.device)
+            # No attention_mask needed or expected
+
+            with torch.no_grad():
+                text_feat = self.text_encoder(
+                    input_ids=input_ids
+                ).pooler_output
+        else:
+            text_feat = None
+
         env_state = None
         if actions is not None:  # training time
             actions = actions[:, :self.model.num_queries]
             is_pad = is_pad[:, :self.model.num_queries]
 
-            a_hat, is_pad_hat, (mu, logvar) = self.model(qpos, cam_image, tac_image, env_state, actions, is_pad)
+            a_hat, is_pad_hat, (mu, logvar) = self.model(
+                qpos, cam_image, tac_image, env_state, actions, is_pad, text_feat
+            )
             total_kld, dim_wise_kld, mean_kld = kl_divergence(mu, logvar)
             loss_dict = dict()
             all_l1 = F.l1_loss(actions, a_hat, reduction="none")
@@ -46,7 +90,7 @@ class ACTPolicy(nn.Module):
             loss_dict["loss"] = loss_dict["l1"] + loss_dict["kl"] * self.kl_weight
             return loss_dict
         else:  # inference time
-            a_hat, _, (_, _) = self.model(qpos, cam_image, tac_image, env_state)  # no action, sample from prior
+            a_hat, _, _ = self.model(qpos, cam_image, tac_image, env_state, text_feat=None)
             return a_hat
 
     def configure_optimizers(self):

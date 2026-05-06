@@ -15,6 +15,11 @@ Episode flow
 from ._base_task import *
 import numpy as np
 from math import sqrt
+from tacex_uipc import (
+    UipcObject,
+    UipcObjectCfg,
+)
+
 # ── Offscreen parking ─────────────────────────────────────────────────────────
 OFFSCREEN_X      = 3.0
 OFFSCREEN_Y_START = 3.0
@@ -32,9 +37,12 @@ _SUCCESS_Z_MIN  = 0.08   # m — fruit must be below bowl_z + this value
 # ── Fruit asset configurations ────────────────────────────────────────────────
 FRUITS_CONFIGS: dict[str, dict] = {
     'pear': {
-        'asset_path': 'fruits_tet/banana.usd',
-        'density': 10.0,
-        'grasp_z': 0.010,
+        'asset_path': 'fruits_tet/pear.usd',
+        'density': 1010,
+        'm_kappa' : 200,
+        'grasp_z': -0.01,
+        'depth_threshold': 26,
+
         'instructions': [
             "Grasp the pear and put it in the bowl.",
             "Pick up the pear and drop it into the bowl.",
@@ -45,8 +53,11 @@ FRUITS_CONFIGS: dict[str, dict] = {
     },
     'banana': {
         'asset_path': 'fruits_tet/banana.usd',
-        'density': 10.0,
-        'grasp_z': 0,
+        'density': 950,
+        'grasp_z': -0.015,
+        'm_kappa': 50,
+        'depth_threshold': 25,
+
         'instructions': [
             "Grasp the banana and put it in the bowl.",
             "Pick up the banana and drop it into the bowl.",
@@ -56,9 +67,11 @@ FRUITS_CONFIGS: dict[str, dict] = {
         ],
     },
     'cherry': {
-        'asset_path': 'fruits_tet/banana.usd',
-        'density': 10.0,
-        'grasp_z': 0.006,
+        'asset_path': 'fruits_tet/cherry.usd',
+        'density': 1100,
+        'grasp_z': -0.01,
+        'm_kappa': 1500,
+        'depth_threshold': 27,
         'instructions': [
             "Grasp the cherry and put it in the bowl.",
             "Pick up the cherry and drop it into the bowl.",
@@ -69,8 +82,10 @@ FRUITS_CONFIGS: dict[str, dict] = {
     },
     'lemon': {
         'asset_path': 'fruits_tet/lemon.usd',
-        'density': 10.0,
-        'grasp_z': 0.006,
+        'density': 1050,
+        'grasp_z': -0.015,
+        'm_kappa': 600,
+        'depth_threshold': 26,
         'instructions': [
             "Grasp the lemon and put it in the bowl.",
             "Pick up the lemon and drop it into the bowl.",
@@ -81,8 +96,10 @@ FRUITS_CONFIGS: dict[str, dict] = {
     },
     'orange': {
         'asset_path': 'fruits_tet/orange.usd',
-        'density': 10.0,
-        'grasp_z': 0.010,
+        'density': 860,
+        'grasp_z': -0.015,
+        'm_kappa': 400,
+        'depth_threshold': 26,
         'instructions': [
             "Grasp the orange and put it in the bowl.",
             "Pick up the orange and drop it into the bowl.",
@@ -126,8 +143,8 @@ FRUITS_CONFIGS: dict[str, dict] = {
         "Pick the coconut and drop it into the fruit bowl.",
     ],"""
 
-#fruit = 'lemon'
-#FRUITS_CONFIGS = {fruit: FRUITS_CONFIGS[fruit]}
+"""fruit = 'pear'
+FRUITS_CONFIGS = {fruit: FRUITS_CONFIGS[fruit]}"""
 
 ALL_FRUIT_NAMES: list[str] = list(FRUITS_CONFIGS.keys())
 
@@ -153,8 +170,6 @@ class TaskCfg(BaseTaskCfg):
     force_fast: float        = 50.0
     force_slow: float        = 20.0
     n_objects: int           = 3
-    depth_threshold: float = 22.5
-
     grasp_axis_angle_std: float  = 0.15   # rad — rotation noise on close axis
     grasp_pos_xy_std: float      = 0.008  # m   — XY noise on grasp point
     grasp_pos_z_std: float       = 0.004  # m   — Z noise on grasp point
@@ -170,9 +185,9 @@ class Task(BaseTask):
         render_mode: str | None = None,
         **kwargs,
     ):
-        cfg.sim.physics_material.dynamic_friction = 2.0
-        cfg.sim.physics_material.static_friction  = 2.0
-        cfg.uipc_sim.contact.default_friction_ratio = 2.0
+
+        cfg.uipc_sim.contact.default_friction_ratio = 0.5
+
         super().__init__(cfg, mode, render_mode, **kwargs)
 
     # ── Actor creation (called once at env build) ─────────────────────────────
@@ -254,6 +269,7 @@ class Task(BaseTask):
                 [OFFSCREEN_X, OFFSCREEN_Y_START - i * GRID_SPACING_Y, OFFSCREEN_Z],
                 [1, 0, 0, 0],
             )
+            UipcObjectCfg.AffineBodyConstitutionCfg()
             actor = self._actor_manager.add_from_usd_file(
                 name=name,
                 asset_path=FRUITS_CONFIGS[name]['asset_path'],
@@ -312,6 +328,7 @@ class Task(BaseTask):
 
     # ── Per-episode reset ─────────────────────────────────────────────────────
     def _reset_actors(self):
+        self.success_type: str = 'none'  
         self._robot_manager._reset_idx()
 
         # 1. Randomize bowl pose (kept near table centre)
@@ -394,11 +411,21 @@ class Task(BaseTask):
         # ── 2. Rotate by object pose ──────────────────────────────────────────
         q = self._fruits[self._target_name].get_pose().q
         w, x, y, z = float(q[0]), float(q[1]), float(q[2]), float(q[3])
-        R = np.array([
-            [1-2*(y*y+z*z),  2*(x*y-z*w),  2*(x*z+y*w)],
-            [  2*(x*y+z*w),1-2*(x*x+z*z),  2*(y*z-x*w)],
-            [  2*(x*z-y*w),  2*(y*z+x*w),1-2*(x*x+y*y)],
-        ])
+
+        if self._target_name == 'pear' :
+            yaw = np.arctan2(2*(w*z + x*y), 1 - 2*(y*y + z*z))
+            cy, sy = np.cos(yaw), np.sin(yaw)
+            R = np.array([
+                [cy, -sy, 0.],
+                [sy,  cy, 0.],
+                [0.,  0., 1.],
+            ])
+        else :
+            R = np.array([
+                [1-2*(y*y+z*z),  2*(x*y-z*w),  2*(x*z+y*w)],
+                [  2*(x*y+z*w),1-2*(x*x+z*z),  2*(y*z-x*w)],
+                [  2*(x*z-y*w),  2*(y*z+x*w),1-2*(x*x+y*y)],
+            ])
         close_axis = R @ base_close_axis
 
         # ── 3. Grasp position with noise ──────────────────────────────────────
@@ -428,70 +455,6 @@ class Task(BaseTask):
         return lost
 
     # ── Main episode logic ────────────────────────────────────────────────────
-
-    def _play_once(self):
-        """Grasp the target fruit and drop it into the bowl."""
-        cfg   = FRUITS_CONFIGS[self._target_name]
-
-        # Sample all noise once per episode so every step uses the same draw
-        noise = self._sample_grasp_noise()
-        _, contact_idx = self._build_grasp_pose(noise)
-
-        # ── 1. Approach ───────────────────────────────────────────────────────
-        obj_p        = self._fruits[self._target_name].get_pose().p
-        ee_now       = self.atom.get_arm_pose()
-        approach_z   = 0.25
-
-        above_fruit = Pose(
-            [obj_p[0], obj_p[1], obj_p[2] + cfg['grasp_z'] + approach_z],
-            ee_now.q,
-        )
-        self.move(self.atom.move_to_pose(above_fruit), time_dilation_factor=0.5)
-
-        # ── 2. Descend and grasp ──────────────────────────────────────────────
-        self.move(self.atom.grasp_actor(
-            self._fruits[self._target_name],
-            contact_point_id=contact_idx,
-            is_close=False,
-        ))
-        force_to_apply = self.cfg.force_slow if self._target_name == '' else self.cfg.force_fast
-        self.move(self.atom.close_gripper(
-            force=force_to_apply,
-            depth_threshold=self.cfg.depth_threshold,
-        ))
-
-        # ── 3. Lift — randomised height ───────────────────────────────────────
-        self.move(self.atom.move_by_displacement(z=noise['lift_z']))
-
-        if self.check_mid_failure():
-            print("[puts_fruits_bowl] aborting: fruit dropped during lift")
-            return
-
-        # ── 4. Move above bowl — with XY noise ────────────────────────────────
-        bowl_p = self._bowl.get_pose().p
-        ee_now = self.atom.get_arm_pose()
-
-        above_bowl = Pose(
-            [
-                bowl_p[0] + noise['drop_xy'][0],   # ← XY noise on target waypoint
-                bowl_p[1] + noise['drop_xy'][1],
-                ee_now.p[2],
-            ],
-            ee_now.q,
-        )
-        self.move(self.atom.move_to_pose(above_bowl), time_dilation_factor=0.5)
-
-        # ── 6. Lower — randomised descent depth ──────────────────────────────
-        self.move(
-            self.atom.move_by_displacement(z=-noise['drop_z']),
-            time_dilation_factor=0.5,
-        )
-
-        # ── 7. Release ────────────────────────────────────────────────────────
-        self.move(self.atom.open_gripper(force=self.cfg.force_fast, steps=40))
-
-        self.delay(10)
-
     # ── Success criterion ─────────────────────────────────────────────────────
 
     def check_success(self) -> bool:
@@ -518,3 +481,80 @@ class Task(BaseTask):
             f"success={in_bowl}"
         )
         return in_bowl
+    
+    def _play_once(self):
+        """Grasp the target fruit and drop it into the bowl."""
+        cfg   = FRUITS_CONFIGS[self._target_name]
+
+        # Sample all noise once per episode so every step uses the same draw
+        noise = self._sample_grasp_noise()
+        grasp_pose, contact_idx = self._build_grasp_pose(noise)
+        obj_p  = self._fruits[self._target_name].get_pose().p
+        ee_now = self.atom.get_arm_pose()
+        approach_z = 0.25
+
+        # ── 2. Go above fruit (position only, keep current orientation) ────────────
+        above_fruit_pos = np.array([
+            obj_p[0],
+            obj_p[1],
+            obj_p[2] + cfg['grasp_z'] + approach_z
+        ])
+
+        above_fruit = Pose(above_fruit_pos, ee_now.q)
+
+        self.move(
+            self.atom.move_to_pose(above_fruit),
+        )
+
+        # ── 3. Rotate wrist in place (IMPORTANT) ───────────────────────────────────
+        above_fruit_rotated = Pose(above_fruit_pos, grasp_pose.q)
+
+        self.move(
+            self.atom.move_to_pose(above_fruit_rotated),
+        )
+
+        # ── 4. Descend straight down (no rotation anymore) ─────────────────────────
+        self.move(self.atom.grasp_actor(
+            self._fruits[self._target_name],
+            contact_point_id=contact_idx,
+            is_close=False,
+        ))
+        force_to_apply = self.cfg.force_slow if self._target_name in  [''] else self.cfg.force_fast
+        self.move(self.atom.close_gripper(force=force_to_apply,depth_threshold=FRUITS_CONFIGS[self._target_name]['depth_threshold']))
+        # ── 5. Lift — randomised height ───────────────────────────────────────
+        self.move(self.atom.move_by_displacement(z=noise['lift_z']))
+        
+        if self.check_mid_failure():
+            print("[puts_fruits_bowl] aborting: fruit dropped during lift")
+            return
+
+        # ── 6. Move above bowl — with XY noise ────────────────────────────────
+        bowl_p = self._bowl.get_pose().p
+        ee_now = self.atom.get_arm_pose()
+
+        above_bowl = Pose(
+            [
+                bowl_p[0] + noise['drop_xy'][0],   # ← XY noise on target waypoint
+                bowl_p[1] + noise['drop_xy'][1],
+                ee_now.p[2],
+            ],
+            ee_now.q,
+        )
+        self.move(self.atom.move_to_pose(above_bowl), time_dilation_factor=0.5)
+
+        # ── 7. Lower — randomised descent depth ──────────────────────────────
+        self.move(
+            self.atom.move_by_displacement(z=-noise['drop_z']),
+            time_dilation_factor=0.5,
+        )
+
+        if self.check_success():
+            self.success_type = 'slip_success' 
+
+        # ── 8. Release ────────────────────────────────────────────────────────
+        self.move(self.atom.open_gripper(force=self.cfg.force_fast, steps=40))
+
+        self.delay(10)
+        if self.check_success() and self.success_type != 'slip_success':
+            self.success_type = 'normal_success' 
+

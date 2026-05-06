@@ -112,7 +112,7 @@ def log(msg):
 def run(task: 'BaseTask', episode_num, use_seed, start_seed, max_seed):
     suc_num, seed = 0, 0
     suc_map = []
-    number_seed = start_seed - max_seed + 1
+    number_seed = abs(start_seed - max_seed) + 1
     if start_seed != -1:
         seed = start_seed
         log(f"Starting from seed {seed}.")
@@ -139,15 +139,17 @@ def run(task: 'BaseTask', episode_num, use_seed, start_seed, max_seed):
         else:
             if task.plan_success and task.check_success() and not task.check_early_stop():
                 task.save_to_hdf5()
-                log(f"[{suc_num:<3d}] Seed {seed} success in {cost_t:.2f} s.\n"
+
+                success_type = getattr(task, 'success_type', 'normal_success')
+                log(f"[{suc_num:<3d}] Seed {seed} success [{success_type}] in {cost_t:.2f} s.\n"
                     f"steps: {task.step_count:<5d}, save frames: {task.save_count:<5d}.\n")
                 suc_num += 1
-                suc_map.append('1')
+                suc_map.append('1')    
                 if mean_steps > 0: 
                     mean_steps = ((suc_num - 1) * mean_steps + task.step_count) / suc_num
                 else:
                     mean_steps = task.step_count
-                task.clean_cache(mean_steps=mean_steps, result='success')
+                task.clean_cache(mean_steps=mean_steps, result=success_type)  # ← propagates label
             else:
                 log(f"[{suc_num:<3d}] Seed {seed} failed in {cost_t:.2f} s.\n"
                     f"Plan {task.plan_success}, Check {task.check_success()}")

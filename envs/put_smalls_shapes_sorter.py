@@ -46,6 +46,7 @@ SHAPE_CONFIGS: dict[str, dict] = {
         'asset_path': 'shapes/cube.usd',
         'density': 15.0,
         'grasp_z': 0.012,
+        'asset_offset' : [0,0,0],
         "grasp_pos_floor": 0.040/0.078,
         'hole_x_offset': -2*DELTA_HOLES,
         'canonical_axis':    [1, 0, 0],
@@ -62,6 +63,7 @@ SHAPE_CONFIGS: dict[str, dict] = {
     'cylinder': {
         'asset_path': 'shapes/cylinder.usd',
         'density': 15.0,
+        'asset_offset' : [0,0,0],
         'grasp_z': 0.012,
         "grasp_pos_floor": 0.037/0.078,
         'hole_x_offset': -DELTA_HOLES,
@@ -78,6 +80,7 @@ SHAPE_CONFIGS: dict[str, dict] = {
         'asset_path': 'shapes/triangular_prism.usd',
         'density': 15.0,
         'grasp_z': 0.012,
+        'asset_offset' : [0,0,0],
         'hole_x_offset': 0.0,
         "grasp_pos_floor": 0.035/0.078,
         'canonical_axis':    [0, 1, 0],
@@ -95,6 +98,7 @@ SHAPE_CONFIGS: dict[str, dict] = {
         'asset_path': 'shapes/star.usd',
         'density': 15.0,
         'grasp_z': 0.012,
+        'asset_offset' : [0,0,0],
         "grasp_pos_floor": 0.030/0.078,
         'hole_x_offset': DELTA_HOLES,
         'canonical_axis':    [0, 1, 0],
@@ -112,6 +116,7 @@ SHAPE_CONFIGS: dict[str, dict] = {
         'asset_path': 'shapes/moon.usd',
         'density': 15,
         'grasp_z': 0.012,
+        'asset_offset' : [0,0.01558,0],
         "grasp_pos_floor": 0.013/0.078,
         'hole_x_offset': 2 * DELTA_HOLES,
         'canonical_axis':    [1, 0, 0],
@@ -154,7 +159,7 @@ _SUCCESS_Z_MIN  = 0.05
 
 @configclass
 class TaskCfg(BaseTaskCfg):
-    step_lim: int              = 800
+    step_lim: int              = 1600
     use_adaptive_grasp: bool   = True
     use_force_grasp: bool      = False
     force_fast = 50 
@@ -321,6 +326,7 @@ class Task(BaseTask):
         return poses
     
     def _reset_actors(self):
+        self.success_type = 'none'
         self._robot_manager._reset_idx()
         # Randomly choose nb of shape present on the tables
         n = self.rng.integers(2, len(ALL_SHAPE_NAMES))
@@ -488,65 +494,122 @@ class Task(BaseTask):
             ee_now.q,
         )
         self.move(self.atom.move_to_pose(above_hole))
-        # Correct for cuRobo FK vs Isaac Lab FK residual XY error.
-       
 
-        # 4. Lower into the hole (sorter top at 0.40 m, hole depth 0.34 m)
-        # Drop by 0.15 m → EE at ~0.33 m, well inside the 0.34 m deep hole
         self.move(self.atom.move_by_displacement(z=-0.12))
-        def correct_angle():
+
+        def correct_angle(noise_rad=0.0):
             theta = self._compute_z_rotation_correction(self._target_name)
-            print("ROTATING OF THETA", theta)
-            if abs(theta) > np.radians(2.0):  # 2° dead-band
+            theta += noise_rad
+            print(f"ROTATING OF THETA {np.degrees(theta):.2f}° (noise={np.degrees(noise_rad):.2f}°)")
+            if abs(theta) > np.radians(2.0):
                 self.move(self.atom.rotate_wrist_z(theta))
 
-        def correct_position():
-            obj_p = self._shapes[self._target_name].get_pose().p
+        def correct_position(noise_xy=0.0):
+            obj_p = self._shapes[self._target_name].get_pose().p + cfg['asset_offset']
             x_err = drawer_p[0]              - obj_p[0]
             y_err = drawer_p[1] + hole_y_off - obj_p[1]
+            # Noise is signed-random: biased offset, not pure centering
+            x_err += np.random.uniform(-noise_xy, noise_xy)
+            y_err += np.random.uniform(-noise_xy, noise_xy)
+            print(f"POSITION ERR x={x_err*1000:.1f}mm y={y_err*1000:.1f}mm (noise={noise_xy*1000:.1f}mm)")
             if abs(x_err) > 0.002 or abs(y_err) > 0.002:
                 self.move(self.atom.move_by_displacement(x=x_err, y=y_err), time_dilation_factor=0.5)
+        def _quat_tilt_rad(q_ref: np.ndarray, q_now: np.ndarray) -> float:
+            """
+            Angular distance between two quaternions [w, x, y, z] (Isaac Lab convention).
+            Captures any tilt — including the object pivoting on the hole edge.
+            """
+            dot = float(np.clip(abs(np.dot(q_ref, q_now)), 0.0, 1.0))
+            return 2.0 * np.arccos(dot)
+        LIFT_CLEAR      = 0.035
+        SUCCESS_DESCENT = 0.05
+        STEP_DOWN       = 0.007
+        STUCK_TOL_Z       = 0.001
+        STUCK_TOL_TILT  = np.radians(3.0)
+        MAX_STUCK_RETRY = 2
 
-        SUCCESS_DESCENT = 0.15   # m — exit both loops if we descend this much
-        STEP_DOWN       = 0.005 # m — per step
-        STUCK_TOL       = 0.001 # m — if actual movement < this we consider it stuck
+        ANGLE_NOISE_SCHEDULE = [np.radians(4.0), np.radians(1.5), np.radians(0.0)]
+        XY_NOISE_SCHEDULE    = [0.006,            0.002,            0.0  ]  # meters
 
         nb_try = 0
         insertion_success = False
+
         while nb_try < 3 and not insertion_success:
-            print("NB TRY", nb_try)
-            self.move(self.atom.move_by_displacement(z=0.03), time_dilation_factor=0.5)
-            correct_angle()
-            correct_position()
-            self.move(self.atom.move_by_displacement(z=-0.03), time_dilation_factor=0.5)
-            z_start    = self._robot_manager.get_ee_pose().p[2]
-            z_previous = z_start
+            print(f"[insertion] attempt {nb_try+1}")
+
+            angle_noise = ANGLE_NOISE_SCHEDULE[nb_try] * np.random.choice([-1, 1])
+            xy_noise    = XY_NOISE_SCHEDULE[nb_try]
+
+            self.move(self.atom.move_by_displacement(z=LIFT_CLEAR), time_dilation_factor=0.5)
+            correct_angle(noise_rad=angle_noise)
+            correct_position(noise_xy=xy_noise)
+            correct_angle(noise_rad=angle_noise * 0.3)
+
+            # Snapshot reference pose at descent start
+            ref_pose        = self._shapes[self._target_name].get_pose()
+            z_start         = ref_pose.p[2]
+            z_previous      = z_start
+            q_ref           = np.array(ref_pose.q)   # [w, x, y, z]
             total_descended = 0.0
+            stuck_count     = 0
 
             while total_descended < SUCCESS_DESCENT:
                 self.move(self.atom.move_by_displacement(z=-STEP_DOWN), time_dilation_factor=0.5)
-                z_now      = self._shapes[self._target_name].get_pose().p[2]
-                actual_step = z_previous - z_now
-                total_descended = z_start - z_now
-                if actual_step < STUCK_TOL:
-                    print(f"[descent] STUCK at total={total_descended*1000:.1f} mm, retrying")
-                    break
-                z_previous = z_now
+
+                cur_pose    = self._shapes[self._target_name].get_pose()
+                z_now       = cur_pose.p[2]
+                q_now       = np.array(cur_pose.q)
+
+                actual_step     = z_previous - z_now
+                total_descended = z_start    - z_now
+                tilt            = _quat_tilt_rad(q_ref, q_now)
+
+                z_stuck   = actual_step < STUCK_TOL_Z
+                tilt_stuck = tilt       > STUCK_TOL_TILT
+
+                if z_stuck or tilt_stuck:
+                    reason = []
+                    if z_stuck:   reason.append(f"z_stall  Δz={actual_step*1000:.2f}mm")
+                    if tilt_stuck: reason.append(f"tilt={np.degrees(tilt):.1f}°")
+                    stuck_count += 1
+                    print(f"[descent] CONTACT #{stuck_count} — {', '.join(reason)} "
+                        f"at depth={total_descended*1000:.1f}mm")
+
+                    if stuck_count >= MAX_STUCK_RETRY:
+                        print("[descent] escalating to outer retry")
+                        break
+
+                    local_angle_noise = angle_noise * 0.2 * np.random.choice([-1, 1])
+                    local_xy_noise    = xy_noise    * 0.3
+
+                    self.move(self.atom.move_by_displacement(z=LIFT_CLEAR), time_dilation_factor=0.5)
+                    correct_angle(noise_rad=local_angle_noise)
+                    correct_position(noise_xy=local_xy_noise)
+
+                    # Reset reference after recovery — tilt resets too
+                    ref_pose        = self._shapes[self._target_name].get_pose()
+                    z_start         = ref_pose.p[2]
+                    z_previous      = z_start
+                    q_ref           = np.array(ref_pose.q)
+                    total_descended = 0.0
+                else:
+                    z_previous  = z_now
+                    stuck_count = 0
             else:
                 insertion_success = True
-                print(f"[descent] SUCCESS after {nb_try+1} tries, "
+                print(f"[descent] SUCCESS attempt {nb_try+1}, "
                     f"descended {total_descended*1000:.1f} mm")
                 break
 
             nb_try += 1
 
         if not insertion_success:
-            print(f"[descent] FAILED after {nb_try} tries")
-        
+            print(f"[descent] FAILED after {nb_try} attempts")
 
         self.move(self.atom.open_gripper(force=self.cfg.force_fast, steps=40))
-        # 6. Hold for object to fall
         self.delay(15, is_save=False)
+        if self.check_success():
+            self.success_type = 'normal_success'
 
     def check_mid_failure(self) -> bool:
         pose_object = self._shapes[self._target_name].get_pose().p

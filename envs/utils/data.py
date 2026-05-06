@@ -144,9 +144,11 @@ class HDF5Handler:
         result = {}
         # process the first file to initialize the arrays
         with h5py.File(hdf5_paths[0], "r") as f:
+            print(data_paths)
             for data_path in data_paths:
                 endpoint = data_path.rsplit('/', 1)[-1]
                 if 'rgb' in endpoint:
+                    print(data_path)
                     data = self.stream_to_img(f[data_path][()], resize, convert_channels, path=data_path)
                 else:
                     data = f[data_path][()]

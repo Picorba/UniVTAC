@@ -1,14 +1,10 @@
-import h5py
-import sys
+import pickle
+import numpy as np
 
-path = sys.argv[1]
+# Load with the newer numpy (in a venv or container where numpy>=1.25 is available)
+with open("act_ckpt/act-pick_and_place_fruits/demo-50/train_config/dataset_stats.pkl", "rb") as f:
+    stats = pickle.load(f)
 
-def print_structure(name, obj):
-    print(name, "->", type(obj).__name__, end="")
-    if isinstance(obj, h5py.Dataset):
-        print(f"  shape={obj.shape} dtype={obj.dtype}", end="")
-    print()
-
-with h5py.File(path, "r") as f:
-    print(f"=== Structure of {path} ===")
-    f.visititems(print_structure)
+# Re-save with your current environment's numpy
+with open("sact_ckpt/act-pick_and_place_fruits/demo-50/train_config/dataset_stats.pkl", "wb") as f:
+    pickle.dump(stats, f)

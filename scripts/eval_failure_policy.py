@@ -429,6 +429,5 @@ def main():
     # Generate plots after the sim closes – matplotlib does not need it
     generate_plots(records, task.save_root / 'plots', n_bins=args_cli.n_bins)
 
-
 if __name__ == "__main__":
     main()

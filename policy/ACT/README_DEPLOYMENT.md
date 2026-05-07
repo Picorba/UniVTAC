@@ -30,7 +30,7 @@ cp deploy_policy_template.yml deploy_policy_{task_name}.yml
 Key parameters to set:
 ```yaml
 task_name: insert_hole  # Your task name
-ckpt_setting: demo-50   # Must match training: {task_config}-{expert_data_num}
+ckpt_setting: 50   # Must match training: {task_config}-{expert_data_num}
 state_dim: 8            # TacArena single arm (7 DOF + 1 gripper)
 chunk_size: 50          # Must match training
 temporal_agg: false     # Must match training

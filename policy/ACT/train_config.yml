@@ -11,7 +11,7 @@ device: cuda:0
 # DETR parser args
 ckpt_dir: null
 policy_class: ACT
-num_steps: 10000
+num_steps: 50000
 num_epochs: null
 
 # Model training params

@@ -472,14 +472,6 @@ class Task(BaseTask):
         z_ok   = obj_p[2] < bowl_p[2] + _SUCCESS_Z_MIN
 
         in_bowl = xy_ok and z_ok
-
-        print(
-            f"[puts_fruits_bowl] target='{self._target_name}'  "
-            f"active={self._active_names}  "
-            f"xy_err={xy_err:.3f} m  "
-            f"obj_z={obj_p[2]:.3f}  bowl_z={bowl_p[2]:.3f}  "
-            f"success={in_bowl}"
-        )
         return in_bowl
     
     def _play_once(self):

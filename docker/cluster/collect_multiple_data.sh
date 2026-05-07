@@ -2,7 +2,7 @@
 
 BASE_SCRIPT=$SCRATCH/UniVTAC/docker/cluster/collect_data.sh
 STEP=20
-N_JOBS=1
+N_JOBS=5
 TASK_NAME=${1:-"pick_and_place_fruits"}
 TASK_MODE=${2:-"demo"}             
 

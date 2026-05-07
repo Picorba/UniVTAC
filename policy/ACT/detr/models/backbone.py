@@ -92,12 +92,12 @@ class BackboneBase(nn.Module):
 
 class Backbone(BackboneBase):
     """ResNet backbone with frozen BatchNorm."""
-
     def __init__(self, name: str, train_backbone: bool, return_interm_layers: bool, dilation: bool):
-        backbone = getattr(torchvision.models,
-                           name)(replace_stride_with_dilation=[False, False, dilation],
-                                 pretrained=is_main_process(),
-                                 norm_layer=FrozenBatchNorm2d)  # pretrained # TODO do we want frozen batch_norm??
+        backbone = getattr(torchvision.models, name)(
+            replace_stride_with_dilation=[False, False, dilation],
+            weights=torchvision.models.ResNet18_Weights.IMAGENET1K_V1 if (train_backbone and is_main_process()) else None,
+            norm_layer=FrozenBatchNorm2d
+        )
         num_channels = 512 if name in ('resnet18', 'resnet34') else 2048
         super().__init__(backbone, train_backbone, num_channels, return_interm_layers)
 

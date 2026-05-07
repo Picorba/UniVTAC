@@ -322,14 +322,18 @@ def main():
     global args_cli, task_module, policy_module, log_path
 
     task_file_name = args_cli.task_name
+
+    default_root=Path(__file__).parent.parent / 'task_config'
     task_config, task_config_file = get_config(
         args_cli.task_config,
-        default_root=Path(__file__).parent.parent / 'task_config',
+        default_root = default_root,
         type='yaml'
     )
+    default_root=Path(__file__).parent.parent / 'policy'
+
     deploy_config, deploy_config_file = get_config(
         args_cli.deploy_config,
-        default_root=Path(__file__).parent.parent / 'policy',
+        default_root = default_root,
         type='yaml'
     )
     policy_name = deploy_config['policy_name']

@@ -73,5 +73,7 @@ failure_analysis/
 *.png
 *.usdz
 
+/isaaclab-sim/
+
 # Notebooks (or strip outputs before committing)
 *.ipynb
